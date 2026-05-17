@@ -13,6 +13,7 @@ namespace Renderer {
 struct alignas(16) DirectionalLight {
     Math::Vec4f direction;
     Math::Vec4f color;
+    Math::Mat4f space_matrix;
 };
 
 }

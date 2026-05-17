@@ -179,13 +179,19 @@ public:
                 });
             }
 
+            auto light_direction = Math::Vec3f(0.0F, -1.0F, 0.5F).normalized();
+            auto light_position = -light_direction * 1000.0F;
+            auto light_projection = Math::Mat4f::orthographic(-600.0F, 600.0F, -500.0F, 500.0F, 0.001F, 1000.0F);
+            auto light_view = Math::Mat4f::look_at(light_position, { 0.0F, 0.0F, 0.0F }, { 0.0F, 1.0F, 0.0F });
+
             Renderer::FrameData const frame_data {
                 .projection = m_camera.projection(),
                 .view = m_camera.view(),
                 .camera_position = m_camera.position(),
                 .directional_light = Renderer::DirectionalLight {
-                    .direction = { -0.5F, -1.0F, -0.5F, 1.0F },
-                    .color = { 1.0F, 1.0F, 1.0F, 1.0F }
+                    .direction = light_direction,
+                    .color = { 1.0F, 1.0F, 1.0F, 1.0F },
+                    .space_matrix = light_projection * light_view
                 }
             };
             Renderer::DeferredRenderer::SubmitInfo const submit_info {

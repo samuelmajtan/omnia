@@ -15,6 +15,8 @@
 #include <string_view>
 #include <vector>
 
+#include <Common/Expected.h>
+#include <Common/Hash.h>
 #include <Common/Platform.h>
 #include <Common/Types.h>
 
@@ -136,6 +138,13 @@ inline auto write_binary(std::filesystem::path const& path, std::span<std::byte 
         return std::unexpected(std::format("Failed to write file: {}", path.string()));
     }
     return {};
+}
+
+inline auto hash_file(std::filesystem::path const& path) -> std::expected<u64, std::string>
+{
+    std::vector<std::byte> contents;
+    TRY_ASSIGN(contents, File::read_binary(path));
+    return Hash::fnv1a(contents);
 }
 
 }

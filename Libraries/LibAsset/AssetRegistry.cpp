@@ -10,8 +10,15 @@
 #include <Common/Expected.h>
 #include <LibAsset/AssetRegistry.h>
 #include <LibAsset/AssetTraits.h>
+#include <LibDebug/Logger.h>
 
 namespace Asset {
+
+namespace {
+
+constexpr Debug::Logger Logger("Asset Registry");
+
+}
 
 AssetRegistry::AssetRegistry(std::filesystem::path const& root_directory)
     : m_root_directory(root_directory)
@@ -59,7 +66,7 @@ auto AssetRegistry::scan() -> std::expected<void, std::string>
         };
 
         if (auto result = register_asset(asset_entry); !result.has_value()) {
-            m_warnings.push_back(std::move(result).error());
+            Logger.warn("{}", result.error());
         }
     }
 
@@ -112,11 +119,6 @@ auto AssetRegistry::resolve_key(std::filesystem::path path) const -> std::string
 auto AssetRegistry::entries() const -> std::unordered_map<std::string, AssetEntry> const&
 {
     return m_assets_by_key;
-}
-
-auto AssetRegistry::warnings() const -> std::vector<std::string> const&
-{
-    return m_warnings;
 }
 
 }

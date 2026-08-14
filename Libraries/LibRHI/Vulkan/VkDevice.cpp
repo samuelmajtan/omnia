@@ -5,8 +5,9 @@
  */
 
 #include <format>
-#include <print>
 #include <vector>
+
+#include <LibDebug/Logger.h>
 
 #define VMA_IMPLEMENTATION
 #include <LibRHI/Vulkan/VkBuffer.h>
@@ -27,22 +28,43 @@
 
 namespace RHI {
 
-static VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT severity, [[maybe_unused]] VkDebugUtilsMessageTypeFlagsEXT message_type, VkDebugUtilsMessengerCallbackDataEXT const* callback_data, [[maybe_unused]] void* user_data)
-{
-    if (severity < VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
-        return VK_FALSE;
+namespace {
 
+constexpr Debug::Logger Logger("Vulkan RHI");
+
+auto to_log_level(VkDebugUtilsMessageSeverityFlagBitsEXT severity) -> Debug::LogLevel
+{
     switch (severity) {
     case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT:
+        return Debug::LogLevel::Trace;
     case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT:
+        return Debug::LogLevel::Debug;
     case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:
+        return Debug::LogLevel::Warn;
     case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:
-        std::println(stderr, "Vulkan Debug: {}", callback_data->pMessage);
-        break;
+        return Debug::LogLevel::Error;
     case VK_DEBUG_UTILS_MESSAGE_SEVERITY_FLAG_BITS_MAX_ENUM_EXT:
         break;
     }
+    return Debug::LogLevel::Debug;
+}
 
+auto to_string(VkDebugUtilsMessageTypeFlagsEXT message_type) -> std::string_view
+{
+    if ((message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT) != 0) {
+        return "Validation";
+    }
+    if ((message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT) != 0) {
+        return "Performance";
+    }
+    return "General";
+}
+
+}
+
+static VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT severity, VkDebugUtilsMessageTypeFlagsEXT message_type, VkDebugUtilsMessengerCallbackDataEXT const* callback_data, [[maybe_unused]] void* user_data)
+{
+    Logger.log(to_log_level(severity), "{}: {}", to_string(message_type), callback_data->pMessage);
     return VK_FALSE;
 }
 

@@ -6,6 +6,12 @@
 
 #pragma once
 
+#include <Common/Types.h>
+
 namespace Debug {
+
+enum class LogLevel : u8;
+
+class Logger;
 
 }

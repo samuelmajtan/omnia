@@ -9,6 +9,7 @@
 #include <Common/File.h>
 #include <LibAsset/AssetRegistry.h>
 #include <LibAsset/AssetTraits.h>
+#include <LibDebug/Logger.h>
 
 namespace {
 
@@ -21,12 +22,25 @@ protected:
         std::filesystem::remove_all(m_root, error);
         std::filesystem::create_directories(m_root, error);
         ASSERT_FALSE(error) << error.message();
+
+        // scan() reports rejected entries through the logger, so route it to a file we
+        // can read back. Kept beside m_root rather than inside it, so scan cannot see it.
+        m_log_path = std::filesystem::path(testing::TempDir()) / "OmniaRegistryTest.log";
+        ASSERT_TRUE(Debug::Logger::initialize({
+            .file_path = m_log_path,
+            .console_level = Debug::LogLevel::Off,
+            .file_level = Debug::LogLevel::Warn,
+            .write_latest = false })
+                        .has_value());
     }
 
     void TearDown() override
     {
+        Debug::Logger::shutdown();
+
         std::error_code error;
         std::filesystem::remove_all(m_root, error);
+        std::filesystem::remove(m_log_path, error);
     }
 
     void add_file(std::string_view relative_path) const
@@ -34,7 +48,14 @@ protected:
         ASSERT_TRUE(File::write_all(m_root / relative_path, "placeholder").has_value());
     }
 
+    auto captured_warnings() const -> std::string
+    {
+        Debug::Logger::shutdown();
+        return File::read_all(m_log_path).value_or(std::string {});
+    }
+
     std::filesystem::path m_root;
+    std::filesystem::path m_log_path;
 };
 
 }
@@ -150,8 +171,10 @@ TEST_F(Registry, DuplicateKeyIsReportedAsAWarning)
     ASSERT_TRUE(registry.scan().has_value());
 
     EXPECT_EQ(registry.entries().size(), 1U);
-    ASSERT_EQ(registry.warnings().size(), 1U);
-    EXPECT_NE(registry.warnings()[0].find("Textures/Error"), std::string::npos);
+
+    auto const logged = captured_warnings();
+    EXPECT_NE(logged.find("Textures/Error"), std::string::npos);
+    EXPECT_NE(logged.find("WARN"), std::string::npos);
 }
 
 TEST_F(Registry, CleanScanHasNoWarnings)
@@ -161,7 +184,9 @@ TEST_F(Registry, CleanScanHasNoWarnings)
 
     Asset::AssetRegistry registry(m_root);
     ASSERT_TRUE(registry.scan().has_value());
-    EXPECT_TRUE(registry.warnings().empty());
+
+    EXPECT_EQ(registry.entries().size(), 2U);
+    EXPECT_TRUE(captured_warnings().empty());
 }
 
 TEST_F(Registry, EmptyRootIsNotAnError)

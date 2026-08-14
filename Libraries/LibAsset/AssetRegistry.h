@@ -59,12 +59,10 @@ public:
     auto resolve_key(std::filesystem::path path) const -> std::string;
 
     auto entries() const -> std::unordered_map<std::string, AssetEntry> const&;
-    auto warnings() const -> std::vector<std::string> const&;
 private:
     std::filesystem::path m_root_directory;
     std::unordered_map<std::string, AssetEntry> m_assets_by_key;
     std::unordered_map<AssetID, std::string> m_keys_by_id;
-    std::vector<std::string> m_warnings;
 };
 
 }

@@ -1,5 +1,5 @@
 set(SOURCES
-        main.cpp
+        Logger.cpp
 )
 
 omnia_lib(LibDebug

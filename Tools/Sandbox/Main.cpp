@@ -4,12 +4,12 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-#include <print>
 #include <ranges>
 
 #include <Common/Expected.h>
 #include <Common/Types.h>
 #include <LibAsset/AssetManager.h>
+#include <LibDebug/Logger.h>
 #include <LibMath/Math.h>
 #include <LibPlatform/Event.h>
 #include <LibPlatform/Window.h>
@@ -20,6 +20,12 @@
 #include <LibRenderer/Model.h>
 #include <LibRenderer/ResourceManager.h>
 
+namespace {
+
+constexpr Debug::Logger Logger { "Sandbox" };
+
+}
+
 class Sandbox final {
 public:
     static auto create() -> std::expected<std::unique_ptr<Sandbox>, std::string>
@@ -28,9 +34,6 @@ public:
 
         if (auto result = sandbox->m_asset_manager.load_loose_assets(); !result.has_value()) {
             return std::unexpected(std::move(result).error());
-        }
-        for (auto const& warning : sandbox->m_asset_manager.registry().warnings()) {
-            std::println(stderr, "{}", warning);
         }
 
         Platform::Window::Configuration const window_config {
@@ -121,15 +124,15 @@ public:
         };
 
         if (auto result = m_swapchain->recreate(swapchain_config); !result.has_value()) {
-            std::println(stderr, "{}", result.error());
+            Logger.error("{}", result.error());
             return false;
         }
         if (auto result = create_swapchain_render_targets(); !result.has_value()) {
-            std::println(stderr, "{}", result.error());
+            Logger.error("{}", result.error());
             return false;
         }
         if (auto result = m_deferred_renderer->resize(swapchain_config.width, swapchain_config.height); !result.has_value()) {
-            std::println(stderr, "{}", result.error());
+            Logger.error("{}", result.error());
             return false;
         }
         return true;
@@ -233,11 +236,20 @@ private:
 
 auto main() -> i32
 {
+    if (auto result = Debug::Logger::initialize(); !result.has_value()) {
+        Logger.warn("{}", result.error());
+    } else {
+        Logger.info("Logging to {}", Debug::Logger::file_path().string());
+    }
+
     auto sandbox = Sandbox::create();
     if (!sandbox.has_value()) {
-        std::println(stderr, "{}", sandbox.error());
+        Logger.fatal("{}", sandbox.error());
+        Debug::Logger::shutdown();
         return EXIT_FAILURE;
     }
+
     sandbox.value()->run();
+    Debug::Logger::shutdown();
     return EXIT_SUCCESS;
 }

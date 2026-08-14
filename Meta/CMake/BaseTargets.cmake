@@ -1,6 +1,12 @@
 include(CMakeParseArguments)
 include(GenerateExportHeader)
 
+function(omnia_link_debug target)
+    if (NOT target STREQUAL "LibDebug")
+        target_link_libraries(${target} PUBLIC LibDebug)
+    endif ()
+endfunction()
+
 function(omnia_lib target)
     cmake_parse_arguments(OMNIA "" "" "SOURCES;LIBS;THIRD_PARTY;INCLUDE_DIRS" ${ARGN})
 
@@ -8,6 +14,7 @@ function(omnia_lib target)
 
     target_sources(${target} PRIVATE ${OMNIA_SOURCES})
     target_link_libraries(${target} PUBLIC Common PRIVATE ${OMNIA_LIBS} ${OMNIA_THIRD_PARTY})
+    omnia_link_debug(${target})
     if (OMNIA_LIBS)
         add_dependencies(${target} ${OMNIA_LIBS})
     endif ()
@@ -36,6 +43,7 @@ function(omnia_app target)
 
     target_sources(${target} PRIVATE ${OMNIA_SOURCES})
     target_link_libraries(${target} PRIVATE Common ${OMNIA_LIBS} ${OMNIA_THIRD_PARTY})
+    omnia_link_debug(${target})
     if (OMNIA_LIBS)
         add_dependencies(${target} ${OMNIA_LIBS})
     endif ()
@@ -53,6 +61,7 @@ function(omnia_test target)
 
     target_sources(${target} PRIVATE ${OMNIA_SOURCES})
     target_link_libraries(${target} PRIVATE Common ${OMNIA_LIBS} ${OMNIA_THIRD_PARTY} GTest::gtest_main)
+    omnia_link_debug(${target})
     if (OMNIA_LIBS)
         add_dependencies(${target} ${OMNIA_LIBS})
     endif ()

@@ -17,6 +17,8 @@ include(BaseCompile)
 include(BaseOptions)
 include(BaseTargets)
 
+enable_testing()
+
 add_subdirectory(Common)
 add_subdirectory(Libraries)
 add_subdirectory(Tests)

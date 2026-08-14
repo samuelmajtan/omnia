@@ -1,0 +1,175 @@
+/*
+ *  Copyright (c) 2026, the Omnia developers
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
+#pragma once
+
+#include <cstring>
+#include <expected>
+#include <format>
+#include <optional>
+#include <span>
+#include <string>
+#include <string_view>
+#include <type_traits>
+#include <vector>
+
+#include <Common/Types.h>
+
+namespace Binary {
+
+template<typename T>
+concept Serializable = std::is_trivially_copyable_v<T> && std::is_default_constructible_v<T>;
+
+class ByteWriter final {
+public:
+    template<Serializable T>
+    void write(T const& value)
+    {
+        auto const* bytes = reinterpret_cast<u8 const*>(&value);
+        m_data.insert(m_data.end(), bytes, bytes + sizeof(T));
+    }
+
+    template<Serializable T>
+    void write_vector(std::vector<T> const& values)
+    {
+        write(static_cast<u64>(values.size()));
+        if (values.empty()) {
+            return;
+        }
+
+        auto const* bytes = reinterpret_cast<u8 const*>(values.data());
+        m_data.insert(m_data.end(), bytes, bytes + (values.size() * sizeof(T)));
+    }
+
+    void write_string(std::string_view value)
+    {
+        write(static_cast<u64>(value.size()));
+        m_data.insert(m_data.end(), value.begin(), value.end());
+    }
+
+    void write_bytes(std::span<std::byte const> value)
+    {
+        auto const* bytes = reinterpret_cast<u8 const*>(value.data());
+        m_data.insert(m_data.end(), bytes, bytes + value.size());
+    }
+
+    template<Serializable T>
+    void write_optional(std::optional<T> const& value)
+    {
+        write(static_cast<u8>(value.has_value() ? 1 : 0));
+        if (value.has_value()) {
+            write(value.value());
+        }
+    }
+
+    auto data() const -> std::vector<u8> const&
+    {
+        return m_data;
+    }
+
+    auto bytes() const -> std::span<std::byte const>
+    {
+        return std::as_bytes(std::span(m_data));
+    }
+
+    auto size() const -> u64
+    {
+        return m_data.size();
+    }
+private:
+    std::vector<u8> m_data;
+};
+
+class ByteReader final {
+public:
+    explicit ByteReader(std::span<std::byte const> data)
+        : m_data(data)
+    {
+    }
+
+    template<Serializable T>
+    auto read() -> std::expected<T, std::string>
+    {
+        if (sizeof(T) > remaining()) {
+            return std::unexpected(std::format("Truncated stream: wanted {} bytes, {} remaining.", sizeof(T), remaining()));
+        }
+
+        T value {};
+        std::memcpy(&value, m_data.data() + m_offset, sizeof(T));
+        m_offset += sizeof(T);
+        return value;
+    }
+
+    template<Serializable T>
+    auto read_vector() -> std::expected<std::vector<T>, std::string>
+    {
+        auto count = read<u64>();
+        if (!count.has_value()) {
+            return std::unexpected(std::move(count).error());
+        }
+
+        if (count.value() > remaining() / sizeof(T)) {
+            return std::unexpected(std::format("Truncated stream: wanted {} elements of {} bytes, {} remaining.", count.value(), sizeof(T), remaining()));
+        }
+
+        std::vector<T> values(count.value());
+        if (count.value() > 0) {
+            std::memcpy(values.data(), m_data.data() + m_offset, count.value() * sizeof(T));
+            m_offset += count.value() * sizeof(T);
+        }
+        return values;
+    }
+
+    auto read_string() -> std::expected<std::string, std::string>
+    {
+        auto length = read<u64>();
+        if (!length.has_value()) {
+            return std::unexpected(std::move(length).error());
+        }
+
+        if (length.value() > remaining()) {
+            return std::unexpected(std::format("Truncated stream: wanted a {} byte string, {} remaining.", length.value(), remaining()));
+        }
+
+        std::string value(reinterpret_cast<char const*>(m_data.data() + m_offset), length.value());
+        m_offset += length.value();
+        return value;
+    }
+
+    template<Serializable T>
+    auto read_optional() -> std::expected<std::optional<T>, std::string>
+    {
+        auto has_value = read<u8>();
+        if (!has_value.has_value()) {
+            return std::unexpected(std::move(has_value).error());
+        }
+
+        if (has_value.value() == 0) {
+            return std::optional<T> {};
+        }
+
+        auto value = read<T>();
+        if (!value.has_value()) {
+            return std::unexpected(std::move(value).error());
+        }
+        return std::optional<T>(std::move(value).value());
+    }
+
+    auto remaining() const -> u64
+    {
+        return m_data.size() - m_offset;
+    }
+
+    auto is_exhausted() const -> bool
+    {
+        return remaining() == 0;
+    }
+private:
+    std::span<std::byte const> m_data;
+    u64 m_offset {};
+};
+
+}

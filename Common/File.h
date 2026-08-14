@@ -8,15 +8,19 @@
 
 #include <expected>
 #include <filesystem>
+#include <format>
 #include <fstream>
+#include <span>
 #include <string>
+#include <string_view>
+#include <vector>
 
 #include <Common/Platform.h>
 #include <Common/Types.h>
 
 namespace File {
 
-auto ALWAYS_INLINE read_all(std::filesystem::path const& path) -> std::expected<std::string, std::string>
+inline auto read_all(std::filesystem::path const& path) -> std::expected<std::string, std::string>
 {
     if (!std::filesystem::exists(path)) {
         return std::unexpected(std::format("File does not exist: {}", path.string()));
@@ -34,7 +38,7 @@ auto ALWAYS_INLINE read_all(std::filesystem::path const& path) -> std::expected<
     return std::string(std::istreambuf_iterator<char>(file), {});
 }
 
-auto ALWAYS_INLINE read_lines(std::filesystem::path const& path) -> std::expected<std::vector<std::string>, std::string>
+inline auto read_lines(std::filesystem::path const& path) -> std::expected<std::vector<std::string>, std::string>
 {
     if (!std::filesystem::exists(path)) {
         return std::unexpected(std::format("File does not exist: {}", path.string()));
@@ -59,7 +63,7 @@ auto ALWAYS_INLINE read_lines(std::filesystem::path const& path) -> std::expecte
 }
 
 template<typename T = std::byte>
-auto ALWAYS_INLINE read_binary(std::filesystem::path const& path) -> std::expected<std::vector<T>, std::string>
+inline auto read_binary(std::filesystem::path const& path) -> std::expected<std::vector<T>, std::string>
 {
     if (!std::filesystem::exists(path)) {
         return std::unexpected(std::format("File does not exist: {}", path.string()));
@@ -83,6 +87,55 @@ auto ALWAYS_INLINE read_binary(std::filesystem::path const& path) -> std::expect
     }
 
     return data;
+}
+
+inline auto create_parent_dir(std::filesystem::path const& path) -> std::expected<void, std::string>
+{
+    auto const parent = path.parent_path();
+    if (parent.empty()) {
+        return {};
+    }
+
+    std::error_code error;
+    std::filesystem::create_directories(parent, error);
+    if (error) {
+        return std::unexpected(std::format("Failed to create directory {}: {}", parent.string(), error.message()));
+    }
+    return {};
+}
+
+inline auto write_all(std::filesystem::path const& path, std::string_view content) -> std::expected<void, std::string>
+{
+    if (auto result = create_parent_dir(path); !result.has_value()) {
+        return result;
+    }
+
+    std::ofstream file(path, std::ios::trunc);
+    if (!file.is_open()) {
+        return std::unexpected(std::format("Failed to open file for writing: {}", path.string()));
+    }
+
+    if (!file.write(content.data(), static_cast<std::streamsize>(content.size()))) {
+        return std::unexpected(std::format("Failed to write file: {}", path.string()));
+    }
+    return {};
+}
+
+inline auto write_binary(std::filesystem::path const& path, std::span<std::byte const> data) -> std::expected<void, std::string>
+{
+    if (auto result = create_parent_dir(path); !result.has_value()) {
+        return result;
+    }
+
+    std::ofstream file(path, std::ios::binary | std::ios::trunc);
+    if (!file.is_open()) {
+        return std::unexpected(std::format("Failed to open file for writing: {}", path.string()));
+    }
+
+    if (!data.empty() && !file.write(reinterpret_cast<char const*>(data.data()), static_cast<std::streamsize>(data.size()))) {
+        return std::unexpected(std::format("Failed to write file: {}", path.string()));
+    }
+    return {};
 }
 
 }

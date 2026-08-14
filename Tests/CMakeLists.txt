@@ -1,3 +1,4 @@
+add_subdirectory(Common)
 add_subdirectory(LibAudio)
 add_subdirectory(LibConcurrency)
 add_subdirectory(LibCore)

@@ -10,30 +10,15 @@
 #include <cstddef>
 #include <format>
 #include <optional>
-#include <random>
 #include <span>
 #include <string>
 #include <string_view>
 
 #include <Common/Hash.h>
+#include <Common/Random.h>
 #include <Common/Types.h>
 
 namespace Common {
-
-// TODO: Move this to a more appropriate place, like Common/Random.h
-namespace Random {
-
-inline auto uuid_engine() -> std::mt19937_64&
-{
-    static thread_local std::mt19937_64 engine = [] {
-        std::random_device device;
-        std::seed_seq sequence { device(), device(), device(), device(), device(), device(), device(), device() };
-        return std::mt19937_64(sequence);
-    }();
-    return engine;
-}
-
-}
 
 class UUID final {
 public:
@@ -51,9 +36,13 @@ public:
 
     static auto generate() -> UUID
     {
-        auto& engine = Random::uuid_engine();
+        return generate(Random::shared());
+    }
 
+    static auto generate(Random& random) -> UUID
+    {
         UUID uuid;
+        auto& engine = random.engine();
         auto const high = engine();
         auto const low = engine();
         for (std::size_t i = 0; i < sizeof(high); ++i) {

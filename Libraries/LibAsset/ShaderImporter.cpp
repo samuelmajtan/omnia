@@ -9,6 +9,7 @@
 #include <Common/Expected.h>
 #include <Common/File.h>
 #include <Common/Hash.h>
+#include <Common/String.h>
 #include <LibAsset/ShaderCompiler.h>
 #include <LibAsset/ShaderImporter.h>
 
@@ -19,7 +20,7 @@ namespace {
 // Extract the path of included file from a line, TODO: Seems like this is not very robust, use a regex?
 auto included_path(std::string_view line) -> std::optional<std::string_view>
 {
-    auto const trimmed = line.substr(std::min(line.find_first_not_of(" \t"), line.size()));
+    auto const trimmed = String::trimmed_left(line);
     if (!trimmed.starts_with("#include")) {
         return std::nullopt;
     }

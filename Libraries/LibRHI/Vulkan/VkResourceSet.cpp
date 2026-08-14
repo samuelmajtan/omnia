@@ -43,7 +43,7 @@ auto VkResourceSet::create(Configuration const& config, RHI::VkDevice* device) -
     return resource_set;
 }
 
-VkResourceSet::VkResourceSet(Configuration const& config, RHI::VkDevice const* device)
+VkResourceSet::VkResourceSet([[maybe_unused]] Configuration const& config, RHI::VkDevice const* device)
     : m_device(device)
 {
     assert(device != nullptr);

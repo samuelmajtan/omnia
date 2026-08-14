@@ -80,7 +80,6 @@ private:
 
     // --- Resources --- //
     RHI::Device* m_device {};
-    ResourceManager* m_resource_manager {};
     std::unique_ptr<RHI::ResourceLayout> m_frame_resource_layout;
     std::unique_ptr<RHI::ResourceSet> m_frame_resource_set;
     std::unique_ptr<RHI::Buffer> m_frame_uniform_buffer;

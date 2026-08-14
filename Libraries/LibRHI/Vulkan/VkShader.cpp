@@ -39,7 +39,7 @@ VkShader::VkShader(Configuration const& config, RHI::VkDevice const* device)
     assert(device != nullptr);
     assert(!config.variants.empty());
 
-    auto variant_it = std::ranges::find_if(config.variants.begin(), config.variants.end(), [](Graphics::ShaderVariant const& variant) {
+    [[maybe_unused]] auto variant_it = std::ranges::find_if(config.variants.begin(), config.variants.end(), [](Graphics::ShaderVariant const& variant) {
         return variant.format == Graphics::ShaderFormat::SPIRV;
     });
     assert(variant_it != config.variants.end());

@@ -29,10 +29,9 @@ auto DeferredRenderer::create(Configuration const& config) -> std::expected<std:
 DeferredRenderer::DeferredRenderer(Configuration const& config)
     : m_shadow_map_size(config.shadow_map_size)
     , m_device(config.device)
-    , m_resource_manager(config.resource_manager)
 {
     assert(m_device);
-    assert(m_resource_manager);
+    assert(config.resource_manager);
 }
 
 void DeferredRenderer::submit(SubmitInfo const& submit_info) const

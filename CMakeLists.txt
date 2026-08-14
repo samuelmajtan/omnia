@@ -13,8 +13,8 @@ endif()
 set(OMNIA_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 list(APPEND CMAKE_MODULE_PATH "${OMNIA_SOURCE_DIR}/Meta/CMake")
 
-include(BaseCompile)
 include(BaseOptions)
+include(BaseCompile)
 include(BaseTargets)
 
 enable_testing()

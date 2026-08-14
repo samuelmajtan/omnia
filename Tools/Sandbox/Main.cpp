@@ -26,7 +26,12 @@ public:
     {
         std::unique_ptr<Sandbox> sandbox(new Sandbox);
 
-        sandbox->m_asset_manager.load_loose_assets();
+        if (auto result = sandbox->m_asset_manager.load_loose_assets(); !result.has_value()) {
+            return std::unexpected(std::move(result).error());
+        }
+        for (auto const& warning : sandbox->m_asset_manager.registry().warnings()) {
+            std::println(stderr, "{}", warning);
+        }
 
         Platform::Window::Configuration const window_config {
             .title = "Omnia Sandbox",

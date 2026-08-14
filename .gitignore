@@ -44,3 +44,5 @@ CMakeUserPresets.json
 !.vscode/*.code-snippets
 .history/
 vcpkg_installed/
+
+.omnia/

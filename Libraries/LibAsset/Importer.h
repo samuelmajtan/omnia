@@ -7,7 +7,6 @@
 #pragma once
 
 #include <algorithm>
-#include <any>
 #include <expected>
 #include <filesystem>
 #include <string>
@@ -17,8 +16,14 @@
 
 namespace Asset {
 
-template<typename T>
-struct ImporterTrait;
+class AssetRegistry;
+class AssetSidecar;
+
+struct ImportContext {
+    std::filesystem::path path;
+    AssetRegistry const* registry = nullptr;
+    AssetSidecar const* sidecar = nullptr;
+};
 
 inline auto claims_extension(std::filesystem::path const& path, std::vector<std::string> const& extensions) -> bool
 {

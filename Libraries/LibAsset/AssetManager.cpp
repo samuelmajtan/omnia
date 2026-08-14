@@ -4,13 +4,35 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+#include <format>
+
 #include <LibAsset/AssetManager.h>
 
 namespace Asset {
 
-AssetManager::AssetManager(std::filesystem::path const& root_directory)
-    : m_asset_registry(root_directory)
+AssetManager::AssetManager(Configuration const& config)
+    : m_asset_registry(config.source_root)
+    , m_cache_root(config.cache_root.empty() ? default_cache_root(config.source_root) : config.cache_root)
 {
+}
+
+AssetManager::AssetManager(std::filesystem::path const& source_root)
+    : AssetManager(Configuration { .source_root = source_root, .cache_root = {} })
+{
+}
+
+auto AssetManager::default_cache_root(std::filesystem::path const& source_root) -> std::filesystem::path
+{
+    if (source_root.empty()) {
+        return {};
+    }
+
+    auto normalized = std::filesystem::path(source_root).lexically_normal();
+    if (!normalized.has_filename()) {
+        normalized = normalized.parent_path();
+    }
+
+    return normalized.parent_path() / ".omnia" / "imported";
 }
 
 auto AssetManager::registry() const -> AssetRegistry const&
@@ -18,13 +40,28 @@ auto AssetManager::registry() const -> AssetRegistry const&
     return m_asset_registry;
 }
 
-void AssetManager::load_loose_assets()
+auto AssetManager::cooked_asset_cache_root() const -> std::filesystem::path const&
 {
-    m_asset_registry.scan();
+    return m_cache_root;
 }
 
-void AssetManager::load_packed_assets()
+auto AssetManager::cooked_asset_path(AssetID id) const -> std::filesystem::path
 {
+    auto const name = id.to_string();
+    if (!name) {
+        return {};
+    }
+    return m_cache_root / std::format("{}{}", name.value(), COOKED_FILE_EXTENSION);
+}
+
+auto AssetManager::load_loose_assets() -> std::expected<void, std::string>
+{
+    return m_asset_registry.scan();
+}
+
+auto AssetManager::load_packed_assets() -> std::expected<void, std::string>
+{
+    return {};
 }
 
 }

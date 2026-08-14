@@ -13,23 +13,27 @@
 
 namespace Asset {
 
-auto ModelImporter::import(std::filesystem::path const& path, AssetRegistry const& asset_registry) -> std::expected<ModelData, std::string>
+auto ModelImporter::import(ImportContext const& context) -> std::expected<ModelData, std::string>
 {
-    if (!std::filesystem::exists(path)) {
-        return std::unexpected(std::format("Model file '{}' does not exist", path.string()));
+    if (context.registry == nullptr) {
+        return std::unexpected(std::format("Cannot import '{}' without an asset registry to resolve its textures against.", context.path.string()));
     }
 
-    auto extension = path.extension().string();
+    if (!std::filesystem::exists(context.path)) {
+        return std::unexpected(std::format("Model file '{}' does not exist", context.path.string()));
+    }
+
+    auto extension = context.path.extension().string();
     if (extension == ".gltf") {
-        return import_gltf(path, asset_registry);
+        return import_gltf(context);
     }
 
     return std::unexpected(std::format("Unsupported model file extension '{}'", extension));
 }
 
-auto ModelImporter::source_hash(std::filesystem::path const& path) -> std::expected<u64, std::string>
+auto ModelImporter::source_hash(ImportContext const& context) -> std::expected<u64, std::string>
 {
-    return File::hash_file(path);
+    return File::hash_file(context.path);
 }
 
 auto ModelImporter::supported_extensions() -> std::vector<std::string>
@@ -37,8 +41,10 @@ auto ModelImporter::supported_extensions() -> std::vector<std::string>
     return { ".gltf" };
 }
 
-auto ModelImporter::import_gltf(std::filesystem::path const& path, AssetRegistry const& asset_registry) -> std::expected<ModelData, std::string>
+auto ModelImporter::import_gltf(ImportContext const& context) -> std::expected<ModelData, std::string>
 {
+    auto const& path = context.path;
+    auto const* asset_registry = context.registry;
     auto file_data = File::read_all(path);
     if (!file_data) {
         return std::unexpected(std::move(file_data).error());
@@ -72,8 +78,8 @@ auto ModelImporter::import_gltf(std::filesystem::path const& path, AssetRegistry
                 return std::nullopt;
             }
             auto const texture_path = path.parent_path() / texture_view.texture->image->uri;
-            auto key = asset_registry.resolve_key(texture_path);
-            return asset_registry.key_to_id(key);
+            auto key = asset_registry->resolve_key(texture_path);
+            return asset_registry->key_to_id(key);
         };
 
         if (gltf_material.has_pbr_metallic_roughness) {

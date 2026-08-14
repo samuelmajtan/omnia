@@ -33,16 +33,12 @@ class ASSET_API ModelImporter final {
 public:
     static constexpr u32 VERSION = 1;
 
-    static auto import(std::filesystem::path const& path, AssetRegistry const& asset_registry) -> std::expected<ModelData, std::string>;
-    static auto source_hash(std::filesystem::path const& path) -> std::expected<u64, std::string>;
+public:
+    static auto import(ImportContext const& context) -> std::expected<ModelData, std::string>;
+    static auto source_hash(ImportContext const& context) -> std::expected<u64, std::string>;
     static auto supported_extensions() -> std::vector<std::string>;
 private:
-    static auto import_gltf(std::filesystem::path const& path, AssetRegistry const& asset_registry) -> std::expected<ModelData, std::string>;
-};
-
-template<>
-struct ImporterTrait<ModelData> {
-    using type = ModelImporter;
+    static auto import_gltf(ImportContext const& context) -> std::expected<ModelData, std::string>;
 };
 
 }

@@ -65,5 +65,5 @@ add_custom_target(
         COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${CMAKE_SOURCE_DIR}/Resources
         ${CMAKE_BINARY_DIR}/Resources
-        COMMENT "Copying Resources directory to output folder"
+        COMMENT "Copying Resources to output folder"
 )

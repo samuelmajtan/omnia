@@ -64,8 +64,9 @@ void collect_includes(std::filesystem::path const& base, std::filesystem::path c
 
 }
 
-auto ShaderImporter::import(std::filesystem::path const& path) -> std::expected<ShaderData, std::string>
+auto ShaderImporter::import(ImportContext const& context) -> std::expected<ShaderData, std::string>
 {
+    auto const& path = context.path;
     if (!std::filesystem::exists(path)) {
         return std::unexpected(std::format("Shader file '{}' does not exist", path.string()));
     }
@@ -109,8 +110,10 @@ auto ShaderImporter::import(std::filesystem::path const& path) -> std::expected<
     return shader_data;
 }
 
-auto ShaderImporter::source_hash(std::filesystem::path const& path) -> std::expected<u64, std::string>
+auto ShaderImporter::source_hash(ImportContext const& context) -> std::expected<u64, std::string>
 {
+    auto const& path = context.path;
+
     u64 hash {};
     TRY_ASSIGN(hash, File::hash_file(path));
 

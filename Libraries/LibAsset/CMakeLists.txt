@@ -1,6 +1,9 @@
 set(SOURCES
+        AssetFile.cpp
         AssetManager.cpp
         AssetRegistry.cpp
+        AssetSidecar.cpp
+        AssetTraits.cpp
         ModelImporter.cpp
         ShaderCompiler.cpp
         ShaderImporter.cpp

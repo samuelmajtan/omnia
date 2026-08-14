@@ -123,6 +123,20 @@ public:
         return values;
     }
 
+    template<typename Enum> requires std::is_enum_v<Enum>
+    auto read_enum(Enum lowest, Enum highest) -> std::expected<Enum, std::string>
+    {
+        auto const value = read<u8>();
+        if (!value.has_value()) {
+            return std::unexpected(std::move(value).error());
+        }
+
+        if (value.value() < static_cast<u8>(lowest) || value.value() > static_cast<u8>(highest)) {
+            return std::unexpected(std::format("Invalid enum value {} in stream, expected {} to {}.", value.value(), static_cast<u8>(lowest), static_cast<u8>(highest)));
+        }
+        return static_cast<Enum>(value.value());
+    }
+
     auto read_string() -> std::expected<std::string, std::string>
     {
         auto length = read<u64>();

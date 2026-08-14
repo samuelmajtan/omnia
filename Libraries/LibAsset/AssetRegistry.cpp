@@ -4,10 +4,12 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+#include <algorithm>
+#include <format>
+
+#include <Common/Expected.h>
 #include <LibAsset/AssetRegistry.h>
-#include <LibAsset/ModelImporter.h>
-#include <LibAsset/ShaderImporter.h>
-#include <LibAsset/TextureImporter.h>
+#include <LibAsset/AssetTraits.h>
 
 namespace Asset {
 
@@ -16,66 +18,82 @@ AssetRegistry::AssetRegistry(std::filesystem::path const& root_directory)
 {
 }
 
-void AssetRegistry::scan()
+auto AssetRegistry::scan() -> std::expected<void, std::string>
 {
     if (m_root_directory.empty()) {
-        return;
+        return {};
     }
 
-    auto const model_extensions = ModelImporter::supported_extensions();
-    auto const shader_extensions = ShaderImporter::supported_extensions();
-    auto const texture_extensions = TextureImporter::supported_extensions();
+    std::error_code error;
+    auto iterator = std::filesystem::recursive_directory_iterator(m_root_directory, error);
+    if (error) {
+        return std::unexpected(std::format("Failed to scan {}: {}", m_root_directory.string(), error.message()));
+    }
 
-    std::vector<std::string> supported_extensions;
-    supported_extensions.reserve(model_extensions.size() + shader_extensions.size() + texture_extensions.size());
-    supported_extensions.insert(supported_extensions.end(), model_extensions.begin(), model_extensions.end());
-    supported_extensions.insert(supported_extensions.end(), shader_extensions.begin(), shader_extensions.end());
-    supported_extensions.insert(supported_extensions.end(), texture_extensions.begin(), texture_extensions.end());
-
-    for (auto const& entry : std::filesystem::recursive_directory_iterator(m_root_directory)) {
+    for (auto const& entry : iterator) {
         if (!entry.is_regular_file()) {
             continue;
         }
 
-        if (std::ranges::find(supported_extensions.begin(), supported_extensions.end(), entry.path().extension().string()) == supported_extensions.end()) {
+        auto const type = asset_type_for(entry.path());
+        if (!type) {
             continue;
         }
 
+        auto const sidecar_path = AssetSidecar::path_for(entry.path());
+        AssetSidecar sidecar;
+
+        if (std::filesystem::exists(sidecar_path)) {
+            TRY_ASSIGN(sidecar, AssetSidecar::load(sidecar_path));
+        } else {
+            sidecar = AssetSidecar(Platform::UUID::generate(), type.value());
+            if (auto result = sidecar.save(sidecar_path); !result.has_value()) {
+                return std::unexpected(std::move(result).error());
+            }
+        }
+
         AssetEntry const asset_entry {
-            .id = Platform::UUID::generate(),
+            .sidecar = std::move(sidecar),
             .key = resolve_key(entry.path()),
-            .source_type = AssetSourceType::Loose,
             .source = LooseAssetEntry { .path = entry.path() }
         };
-        register_asset(asset_entry);
+
+        if (auto result = register_asset(asset_entry); !result.has_value()) {
+            m_warnings.push_back(std::move(result).error());
+        }
     }
+
+    return {};
 }
 
-void AssetRegistry::register_asset(AssetEntry const& entry)
+auto AssetRegistry::register_asset(AssetEntry const& entry) -> std::expected<void, std::string>
 {
-    if (m_assets_by_key.contains(entry.key)) {
-        return;
+    if (auto const existing = m_assets_by_key.find(entry.key); existing != m_assets_by_key.end()) {
+        return std::unexpected(std::format("Duplicate asset key '{}' -- keeping the first, ignoring the second. Keys drop the file extension, so two files in one directory whose names differ only by extension will collide.", entry.key));
     }
+
     m_assets_by_key[entry.key] = entry;
-    m_keys_by_id[entry.id] = entry.key;
+    m_keys_by_id[entry.id()] = entry.key;
+    return {};
 }
 
 auto AssetRegistry::key_to_id(std::string const& key) const -> std::optional<AssetID>
 {
-    if (!m_assets_by_key.contains(key)) {
+    auto const it = m_assets_by_key.find(key);
+    if (it == m_assets_by_key.end()) {
         return std::nullopt;
     }
-    return m_assets_by_key.at(key).id;
+    return it->second.id();
 }
 
 auto AssetRegistry::resolve(AssetID id) const -> std::expected<AssetEntry, std::string>
 {
-    auto key_it = m_keys_by_id.find(id);
+    auto const key_it = m_keys_by_id.find(id);
     if (key_it == m_keys_by_id.end()) {
         return std::unexpected(std::format("Asset with ID {} not found in asset registry.", id));
     }
 
-    auto asset_it = m_assets_by_key.find(key_it->second);
+    auto const asset_it = m_assets_by_key.find(key_it->second);
     if (asset_it == m_assets_by_key.end()) {
         return std::unexpected(std::format("Asset with ID {} not found in asset registry.", id));
     }
@@ -89,6 +107,16 @@ auto AssetRegistry::resolve_key(std::filesystem::path path) const -> std::string
     path = std::filesystem::relative(path, m_root_directory);
     path.replace_extension("");
     return path.generic_string();
+}
+
+auto AssetRegistry::entries() const -> std::unordered_map<std::string, AssetEntry> const&
+{
+    return m_assets_by_key;
+}
+
+auto AssetRegistry::warnings() const -> std::vector<std::string> const&
+{
+    return m_warnings;
 }
 
 }

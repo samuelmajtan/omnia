@@ -20,16 +20,16 @@ auto ModelImporter::import(std::filesystem::path const& path, AssetRegistry cons
     }
 
     auto extension = path.extension().string();
-    auto supported_extensions = ModelImporter::supported_extensions();
-    if (std::ranges::find(supported_extensions.begin(), supported_extensions.end(), extension) == supported_extensions.end()) {
-        return std::unexpected(std::format("Unsupported model file extension '{}'", extension));
-    }
-
     if (extension == ".gltf") {
         return import_gltf(path, asset_registry);
     }
 
-    return {};
+    return std::unexpected(std::format("Unsupported model file extension '{}'", extension));
+}
+
+auto ModelImporter::source_hash(std::filesystem::path const& path) -> std::expected<u64, std::string>
+{
+    return File::hash_file(path);
 }
 
 auto ModelImporter::supported_extensions() -> std::vector<std::string>

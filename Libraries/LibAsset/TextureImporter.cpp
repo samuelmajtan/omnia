@@ -48,6 +48,11 @@ auto TextureImporter::import(std::filesystem::path const& path) -> std::expected
     return texture_data;
 }
 
+auto TextureImporter::source_hash(std::filesystem::path const& path) -> std::expected<u64, std::string>
+{
+    return File::hash_file(path);
+}
+
 auto TextureImporter::supported_extensions() -> std::vector<std::string>
 {
     return { ".png", ".jpg", ".jpeg", ".bmp", ".tga" };

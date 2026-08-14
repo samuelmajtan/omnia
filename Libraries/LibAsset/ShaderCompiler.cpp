@@ -21,6 +21,7 @@ static auto to_shaderc(Graphics::ShaderStage stage) -> shaderc_shader_kind
     case ShaderStage::Fragment:
         return shaderc_fragment_shader;
     }
+    return shaderc_glsl_infer_from_source;
 }
 
 class ShaderIncluder : public shaderc::CompileOptions::IncluderInterface {

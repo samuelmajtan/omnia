@@ -46,10 +46,10 @@ TEST(AssetManagerPaths, CookedPathIsUnderTheCacheRoot)
         .source_root = "Resources",
         .cache_root = "cache" });
 
-    auto const id = Platform::UUID::generate();
+    auto const id = Common::UUID::generate();
     auto const path = manager.cooked_asset_path(id);
 
     EXPECT_EQ(path.parent_path().generic_string(), "cache");
     EXPECT_EQ(path.extension().string(), ".oasset");
-    EXPECT_NE(path.filename().string().find(id.to_string().value()), std::string::npos);
+    EXPECT_NE(path.filename().string().find(id.to_string()), std::string::npos);
 }

@@ -50,7 +50,7 @@ TEST_F(Sidecar, PathIsAppendedToTheFullFilename)
 TEST_F(Sidecar, RoundTrip)
 {
     auto const path = m_directory / "asset.png.omnia";
-    auto const id = Platform::UUID::generate();
+    auto const id = Common::UUID::generate();
 
     Asset::AssetSidecar written(id, Asset::AssetType::Texture);
     written.set_setting("srgb", "true");
@@ -67,7 +67,7 @@ TEST_F(Sidecar, AllAssetTypesRoundTrip)
 {
     for (auto const type : { Asset::AssetType::Model, Asset::AssetType::Texture, Asset::AssetType::Shader }) {
         auto const path = m_directory / "asset.omnia";
-        ASSERT_TRUE(Asset::AssetSidecar(Platform::UUID::generate(), type).save(path).has_value());
+        ASSERT_TRUE(Asset::AssetSidecar(Common::UUID::generate(), type).save(path).has_value());
 
         auto const read_back = Asset::AssetSidecar::load(path);
         ASSERT_TRUE(read_back.has_value()) << read_back.error();
@@ -153,7 +153,7 @@ TEST_F(Sidecar, SaveIsDeterministic)
 {
     auto const path = m_directory / "asset.omnia";
 
-    Asset::AssetSidecar sidecar(Platform::UUID::generate(), Asset::AssetType::Texture);
+    Asset::AssetSidecar sidecar(Common::UUID::generate(), Asset::AssetType::Texture);
     sidecar.set_setting("zebra", "1");
     sidecar.set_setting("alpha", "2");
     sidecar.set_setting("middle", "3");

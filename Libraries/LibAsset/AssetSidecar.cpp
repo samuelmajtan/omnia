@@ -15,6 +15,9 @@
 
 namespace Asset {
 
+static constexpr auto UUID_KEY = "uuid";
+static constexpr auto TYPE_KEY = "type";
+
 namespace {
 
 auto trimmed(std::string_view text) -> std::string_view
@@ -31,9 +34,6 @@ auto trimmed(std::string_view text) -> std::string_view
     }
     return text;
 }
-
-constexpr auto uuid_key = "uuid";
-constexpr auto type_key = "type";
 
 }
 
@@ -73,12 +73,12 @@ auto AssetSidecar::load(std::filesystem::path const& sidecar_path) -> std::expec
         auto const key = std::string(trimmed(content.substr(0, separator)));
         auto value = std::string(trimmed(content.substr(separator + 1)));
 
-        if (key == uuid_key) {
-            id = Platform::UUID::from_string(value);
+        if (key == UUID_KEY) {
+            id = Common::UUID::from_string(value);
             if (!id) {
                 return std::unexpected(std::format("{}:{}: '{}' is not a valid UUID.", sidecar_path.string(), number + 1, value));
             }
-        } else if (key == type_key) {
+        } else if (key == TYPE_KEY) {
             type = asset_type_from_string(value);
             if (!type) {
                 return std::unexpected(std::format("{}:{}: '{}' is not a known asset type.", sidecar_path.string(), number + 1, value));
@@ -89,10 +89,10 @@ auto AssetSidecar::load(std::filesystem::path const& sidecar_path) -> std::expec
     }
 
     if (!id) {
-        return std::unexpected(std::format("{}: missing required '{}' key.", sidecar_path.string(), uuid_key));
+        return std::unexpected(std::format("{}: missing required '{}' key.", sidecar_path.string(), UUID_KEY));
     }
     if (!type) {
-        return std::unexpected(std::format("{}: missing required '{}' key.", sidecar_path.string(), type_key));
+        return std::unexpected(std::format("{}: missing required '{}' key.", sidecar_path.string(), TYPE_KEY));
     }
 
     sidecar.m_id = id.value();
@@ -102,15 +102,10 @@ auto AssetSidecar::load(std::filesystem::path const& sidecar_path) -> std::expec
 
 auto AssetSidecar::save(std::filesystem::path const& sidecar_path) const -> std::expected<void, std::string>
 {
-    auto const id_string = m_id.to_string();
-    if (!id_string) {
-        return std::unexpected(std::format("Cannot write {}: the asset ID could not be formatted.", sidecar_path.string()));
-    }
-
     std::string content;
     content += SIDECAR_HEADER;
-    content += std::format("{} = {}\n", uuid_key, id_string.value());
-    content += std::format("{} = {}\n", type_key, to_string(m_type));
+    content += std::format("{} = {}\n", UUID_KEY, m_id.to_string());
+    content += std::format("{} = {}\n", TYPE_KEY, to_string(m_type));
 
     std::vector<std::string> keys;
     keys.reserve(m_settings.size());

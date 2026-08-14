@@ -138,7 +138,7 @@ TEST_F(Registry, ResolveUnknownIDFails)
 {
     Asset::AssetRegistry registry(m_root);
     ASSERT_TRUE(registry.scan().has_value());
-    EXPECT_FALSE(registry.resolve(Platform::UUID::generate()).has_value());
+    EXPECT_FALSE(registry.resolve(Common::UUID::generate()).has_value());
 }
 
 TEST_F(Registry, DuplicateKeyIsReportedAsAWarning)

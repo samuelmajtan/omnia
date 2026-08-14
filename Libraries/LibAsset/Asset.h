@@ -10,11 +10,11 @@
 #include <string_view>
 
 #include <Common/Types.h>
-#include <LibPlatform/UUID.h>
+#include <Common/UUID.h>
 
 namespace Asset {
 
-using AssetID = Platform::UUID;
+using AssetID = Common::UUID;
 
 enum class AssetType : u8 {
     Model = 0,

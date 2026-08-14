@@ -8,5 +8,5 @@ set(SOURCES
 
 omnia_test(LibAsset
     SOURCES ${SOURCES}
-    LIBS LibAsset LibPlatform
+    LIBS LibAsset
 )

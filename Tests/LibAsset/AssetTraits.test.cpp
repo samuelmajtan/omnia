@@ -33,8 +33,8 @@ auto make_model() -> Asset::ModelData
 {
     Asset::MaterialData material;
     material.name = "Fabric";
-    material.albedo_texture_id = Platform::UUID::generate();
-    material.normal_texture_id = Platform::UUID::generate();
+    material.albedo_texture_id = Common::UUID::generate();
+    material.normal_texture_id = Common::UUID::generate();
     material.parameters.base_color = { 0.5F, 0.25F, 0.125F, 1.0F };
     material.parameters.metallic_factor = 0.75F;
     material.parameters.roughness_factor = 0.375F;
@@ -203,8 +203,8 @@ TEST(SerializeModel, TextureSlotsDoNotGetSwapped)
 {
     Asset::MaterialData material;
     material.name = "Slots";
-    material.metallic_roughness_texture_id = Platform::UUID::generate();
-    material.occlusion_texture_id = Platform::UUID::generate();
+    material.metallic_roughness_texture_id = Common::UUID::generate();
+    material.occlusion_texture_id = Common::UUID::generate();
 
     auto const result = round_trip(Asset::ModelData {
         .sub_meshes = { { .vertices = { make_vertex(0.0F) }, .indices = { 0 }, .material_index = 0 } },

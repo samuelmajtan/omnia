@@ -47,11 +47,7 @@ auto AssetManager::cooked_asset_cache_root() const -> std::filesystem::path cons
 
 auto AssetManager::cooked_asset_path(AssetID id) const -> std::filesystem::path
 {
-    auto const name = id.to_string();
-    if (!name) {
-        return {};
-    }
-    return m_cache_root / std::format("{}{}", name.value(), COOKED_FILE_EXTENSION);
+    return m_cache_root / std::format("{}{}", id.to_string(), COOKED_FILE_EXTENSION);
 }
 
 auto AssetManager::load_loose_assets() -> std::expected<void, std::string>

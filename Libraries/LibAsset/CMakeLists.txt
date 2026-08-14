@@ -17,7 +17,6 @@ set(THIRD_PARTY_LIBS unofficial::shaderc::shaderc)
 
 omnia_lib(LibAsset
         SOURCES ${SOURCES}
-        LIBS LibPlatform
         THIRD_PARTY ${THIRD_PARTY_LIBS}
         INCLUDE_DIRS PRIVATE ${Stb_INCLUDE_DIR} ${CGLTF_INCLUDE_DIRS}
 )

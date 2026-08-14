@@ -61,7 +61,7 @@ TEST_F(Context, TextureDecodesWithoutASidecar)
 
 TEST_F(Context, TextureDefaultsToLinearWhenTheSettingIsAbsent)
 {
-    Asset::AssetSidecar const sidecar(Platform::UUID::generate(), Asset::AssetType::Texture);
+    Asset::AssetSidecar const sidecar(Common::UUID::generate(), Asset::AssetType::Texture);
 
     auto const result = Asset::AssetTraits<Asset::TextureData>::import({ .path = m_texture, .sidecar = &sidecar });
 
@@ -71,7 +71,7 @@ TEST_F(Context, TextureDefaultsToLinearWhenTheSettingIsAbsent)
 
 TEST_F(Context, TextureTakesColorSpaceFromTheSidecar)
 {
-    Asset::AssetSidecar sidecar(Platform::UUID::generate(), Asset::AssetType::Texture);
+    Asset::AssetSidecar sidecar(Common::UUID::generate(), Asset::AssetType::Texture);
     sidecar.set_setting("srgb", "true");
 
     auto const result = Asset::AssetTraits<Asset::TextureData>::import({ .path = m_texture, .sidecar = &sidecar });
@@ -82,7 +82,7 @@ TEST_F(Context, TextureTakesColorSpaceFromTheSidecar)
 
 TEST_F(Context, TextureSettingSurvivesARoundTripThroughTheCookedBlob)
 {
-    Asset::AssetSidecar sidecar(Platform::UUID::generate(), Asset::AssetType::Texture);
+    Asset::AssetSidecar sidecar(Common::UUID::generate(), Asset::AssetType::Texture);
     sidecar.set_setting("srgb", "true");
 
     auto const imported = Asset::AssetTraits<Asset::TextureData>::import({ .path = m_texture, .sidecar = &sidecar });

@@ -31,7 +31,7 @@ struct ModelData {
 
 class ASSET_API ModelImporter final {
 public:
-    static constexpr u32 VERSION = 1;
+    static constexpr u32 VERSION = 2;
 
 public:
     static auto import(ImportContext const& context) -> std::expected<ModelData, std::string>;

@@ -46,7 +46,7 @@ auto AssetRegistry::scan() -> std::expected<void, std::string>
         if (std::filesystem::exists(sidecar_path)) {
             TRY_ASSIGN(sidecar, AssetSidecar::load(sidecar_path));
         } else {
-            sidecar = AssetSidecar(Platform::UUID::generate(), type.value());
+            sidecar = AssetSidecar(Common::UUID::generate(), type.value());
             if (auto result = sidecar.save(sidecar_path); !result.has_value()) {
                 return std::unexpected(std::move(result).error());
             }

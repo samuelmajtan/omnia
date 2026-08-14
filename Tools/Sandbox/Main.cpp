@@ -60,14 +60,13 @@ public:
         TRY_ASSIGN(sandbox->m_deferred_renderer, Renderer::DeferredRenderer::create(deferred_renderer_config));
 
         Renderer::Camera::Configuration const camera_config {
-            .projection_type = Renderer::ProjectionType::Perspective,
-            .position = { 0.0F, 0.0F, 0.0F },
-            .perspective = {
+            .projection = Renderer::Camera::PerspectiveConfiguration {
                 .aspect_ratio = static_cast<f32>(swapchain_config.width) / static_cast<f32>(swapchain_config.height),
                 .field_of_view_degrees = 90.0F,
                 .near_plane = 0.1F,
                 .far_plane = 100000.0F
-            }
+            },
+            .position = { 0.0F, 0.0F, 0.0F }
         };
         sandbox->m_camera = Renderer::Camera(camera_config);
 

@@ -11,8 +11,9 @@
 #include <cmath>
 
 #include <Common/Types.h>
-#include <LibMath/Vec3.h>
 #include <LibMath/Quat.h>
+#include <LibMath/Vec3.h>
+#include <LibMath/Vec4.h>
 
 namespace Math {
 
@@ -78,12 +79,22 @@ public:
         return result;
     }
 
+    constexpr auto operator*(Vec4<T> const& vec) const -> Vec4<T>
+    {
+        return Vec4<T> {
+            at(0, 0) * vec.x + at(0, 1) * vec.y + at(0, 2) * vec.z + at(0, 3) * vec.w,
+            at(1, 0) * vec.x + at(1, 1) * vec.y + at(1, 2) * vec.z + at(1, 3) * vec.w,
+            at(2, 0) * vec.x + at(2, 1) * vec.y + at(2, 2) * vec.z + at(2, 3) * vec.w,
+            at(3, 0) * vec.x + at(3, 1) * vec.y + at(3, 2) * vec.z + at(3, 3) * vec.w
+        };
+    }
+
     constexpr auto translate(Vec3<T> const& translation) const -> Mat4<T>
     {
         Mat4<T> result = *this;
-        result[12] += m_elements[0] * translation.x + m_elements[4] * translation.y + m_elements[8] * translation.z;
-        result[13] += m_elements[1] * translation.x + m_elements[5] * translation.y + m_elements[9] * translation.z;
-        result[14] += m_elements[2] * translation.x + m_elements[6] * translation.y + m_elements[10] * translation.z;
+        for (size_t row = 0; row < 4; ++row) {
+            result.at(row, 3) += at(row, 0) * translation.x + at(row, 1) * translation.y + at(row, 2) * translation.z;
+        }
         return result;
     }
 
@@ -95,15 +106,15 @@ public:
     static constexpr auto translation(T x, T y, T z) -> Mat4<T>
     {
         Mat4<T> result = identity();
-        result[12] = x;
-        result[13] = y;
-        result[14] = z;
+        result.at(0, 3) = x;
+        result.at(1, 3) = y;
+        result.at(2, 3) = z;
         return result;
     }
 
     static constexpr auto translation(Vec3<T> const& translation) -> Mat4<T>
     {
-        return translation(translation.x, translation.y, translation.z);
+        return Mat4<T>::translation(translation.x, translation.y, translation.z);
     }
 
     static constexpr auto rotation(T pitch, T yaw, T roll) -> Mat4<T>
@@ -122,9 +133,9 @@ public:
     static constexpr auto scale(T x, T y, T z) -> Mat4<T>
     {
         Mat4<T> result = identity();
-        result[0] = x;
-        result[5] = y;
-        result[10] = z;
+        result.at(0, 0) = x;
+        result.at(1, 1) = y;
+        result.at(2, 2) = z;
         return result;
     }
 
@@ -141,31 +152,26 @@ public:
     static constexpr auto perspective(T fov, T aspect_ratio, T near_plane, T far_plane) -> Mat4<T>
     {
         auto const tan_half_fov = std::tan(fov / static_cast<T>(2));
-        auto const t = tan_half_fov * near_plane;
-        auto const b = -t;
-        auto const r = t * aspect_ratio;
-        auto const l = -r;
 
         Mat4<T> result {};
-        result[0] = (2 * near_plane) / (r - l);
-        result[5] = -((2 * near_plane) / (t - b));
-        result[10] = -far_plane / (far_plane - near_plane);
-        result[11] = -1;
-        result[14] = -(far_plane * near_plane) / (far_plane - near_plane);
-        result[15] = 0;
+        result.at(0, 0) = 1 / (aspect_ratio * tan_half_fov);
+        result.at(1, 1) = -1 / tan_half_fov;
+        result.at(2, 2) = -far_plane / (far_plane - near_plane);
+        result.at(2, 3) = -(far_plane * near_plane) / (far_plane - near_plane);
+        result.at(3, 2) = -1;
         return result;
     }
 
     static constexpr auto orthographic(T left, T right, T bottom, T top, T near_plane, T far_plane) -> Mat4<T>
     {
         Mat4<T> result {};
-        result[0] = 2 / (right - left);
-        result[5] = -2 / (top - bottom);
-        result[10] = -1 / (far_plane - near_plane);
-        result[12] = -(right + left) / (right - left);
-        result[13] = -(top + bottom) / (top - bottom);
-        result[14] = -near_plane / (far_plane - near_plane);
-        result[15] = 1;
+        result.at(0, 0) = 2 / (right - left);
+        result.at(0, 3) = -(right + left) / (right - left);
+        result.at(1, 1) = -2 / (top - bottom);
+        result.at(1, 3) = (top + bottom) / (top - bottom);
+        result.at(2, 2) = -1 / (far_plane - near_plane);
+        result.at(2, 3) = -near_plane / (far_plane - near_plane);
+        result.at(3, 3) = 1;
         return result;
     }
 
@@ -176,19 +182,19 @@ public:
         auto const u = cross(r, f);
 
         Mat4<T> result {};
-        result[0] = r.x;
-        result[1] = r.y;
-        result[2] = r.z;
-        result[4] = u.x;
-        result[5] = u.y;
-        result[6] = u.z;
-        result[8] = -f.x;
-        result[9] = -f.y;
-        result[10] = -f.z;
-        result[12] = -dot(r, eye);
-        result[13] = -dot(u, eye);
-        result[14] = dot(f, eye);
-        result[15] = 1;
+        result.at(0, 0) = r.x;
+        result.at(0, 1) = r.y;
+        result.at(0, 2) = r.z;
+        result.at(0, 3) = -dot(r, eye);
+        result.at(1, 0) = u.x;
+        result.at(1, 1) = u.y;
+        result.at(1, 2) = u.z;
+        result.at(1, 3) = -dot(u, eye);
+        result.at(2, 0) = -f.x;
+        result.at(2, 1) = -f.y;
+        result.at(2, 2) = -f.z;
+        result.at(2, 3) = dot(f, eye);
+        result.at(3, 3) = 1;
         return result;
     }
 
@@ -205,16 +211,16 @@ public:
         auto const wz = quat.w * quat.z;
 
         Mat4<T> result {};
-        result[0] = 1 - (2 * (yy + zz));
-        result[1] = 2 * (xy - wz);
-        result[2] = 2 * (xz + wy);
-        result[4] = 2 * (xy + wz);
-        result[5] = 1 - (2 * (xx + zz));
-        result[6] = 2 * (yz - wx);
-        result[8] = 2 * (xz - wy);
-        result[9] = 2 * (yz + wx);
-        result[10] = 1 - (2 * (xx + yy));
-        result[15] = 1;
+        result.at(0, 0) = 1 - (2 * (yy + zz));
+        result.at(0, 1) = 2 * (xy - wz);
+        result.at(0, 2) = 2 * (xz + wy);
+        result.at(1, 0) = 2 * (xy + wz);
+        result.at(1, 1) = 1 - (2 * (xx + zz));
+        result.at(1, 2) = 2 * (yz - wx);
+        result.at(2, 0) = 2 * (xz - wy);
+        result.at(2, 1) = 2 * (yz + wx);
+        result.at(2, 2) = 1 - (2 * (xx + yy));
+        result.at(3, 3) = 1;
         return result;
     }
 private:

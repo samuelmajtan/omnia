@@ -61,6 +61,11 @@ public:
         return x == other.x && y == other.y && z == other.z && w == other.w;
     }
 
+    constexpr auto conjugate() const -> Quat
+    {
+        return Quat(-x, -y, -z, w);
+    }
+
     constexpr auto length() const -> T
     {
         return std::sqrt((x * x) + (y * y) + (z * z) + (w * w));

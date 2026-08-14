@@ -102,8 +102,27 @@ TEST(Mat4, PerspectiveDepthMapping)
 
     auto const projection = Math::Mat4f::perspective(DEG_TO_RAD(60.0F), aspect, near, far);
 
-    EXPECT_LT(projection[10], 0.0F);
-    EXPECT_LT(projection[10], 0.0F);
+    auto const on_near = projection * Math::Vec4f({ 0.0F, 0.0F, -near }, 1.0F);
+    auto const on_far = projection * Math::Vec4f({ 0.0F, 0.0F, -far }, 1.0F);
+
+    EXPECT_GT(on_near.w, 0.0F);
+    EXPECT_GT(on_far.w, 0.0F);
+    EXPECT_NEAR(on_near.z / on_near.w, 0.0F, 1e-5F);
+    EXPECT_NEAR(on_far.z / on_far.w, 1.0F, 1e-5F);
+}
+
+TEST(Mat4, PerspectiveHandedness)
+{
+    auto const projection = Math::Mat4f::perspective(DEG_TO_RAD(90.0F), 1.0F, 0.1F, 100.0F);
+
+    auto const right_edge = projection * Math::Vec4f({ 1.0F, 0.0F, -1.0F }, 1.0F);
+    EXPECT_NEAR(right_edge.x / right_edge.w, 1.0F, 1e-5F);
+
+    auto const top_edge = projection * Math::Vec4f({ 0.0F, 1.0F, -1.0F }, 1.0F);
+    EXPECT_NEAR(top_edge.y / top_edge.w, -1.0F, 1e-5F);
+
+    auto const behind = projection * Math::Vec4f({ 0.0F, 0.0F, 1.0F }, 1.0F);
+    EXPECT_LT(behind.w, 0.0F);
 }
 
 TEST(Mat4, OrthographicDepthMapping)
@@ -112,13 +131,26 @@ TEST(Mat4, OrthographicDepthMapping)
     auto const far_plane = 100.0F;
     auto const actual = Math::Mat4f::orthographic(-10.0F, 10.0F, -10.0F, 10.0F, near_plane, far_plane);
 
-    auto transform_z = [&](float z) {
-        return actual[10] * z + actual[14];
-    };
+    auto const on_near = actual * Math::Vec4f({ 0.0F, 0.0F, -near_plane }, 1.0F);
+    auto const on_far = actual * Math::Vec4f({ 0.0F, 0.0F, -far_plane }, 1.0F);
 
-    auto const eps = far_plane * 1e-4F;
-    EXPECT_NEAR(transform_z(near_plane), 0.0F, eps);
-    EXPECT_NEAR(transform_z(far_plane), -1.0F, eps);
+    auto const eps = 1e-4F;
+    EXPECT_NEAR(on_near.w, 1.0F, eps);
+    EXPECT_NEAR(on_near.z, 0.0F, eps);
+    EXPECT_NEAR(on_far.z, 1.0F, eps);
+}
+
+TEST(Mat4, OrthographicOffCenter)
+{
+    auto const actual = Math::Mat4f::orthographic(0.0F, 20.0F, 0.0F, 10.0F, 0.1F, 100.0F);
+
+    auto const center = actual * Math::Vec4f({ 10.0F, 5.0F, -1.0F }, 1.0F);
+    EXPECT_NEAR(center.x, 0.0F, 1e-5F);
+    EXPECT_NEAR(center.y, 0.0F, 1e-5F);
+
+    auto const corner = actual * Math::Vec4f({ 20.0F, 10.0F, -1.0F }, 1.0F);
+    EXPECT_NEAR(corner.x, 1.0F, 1e-5F);
+    EXPECT_NEAR(corner.y, -1.0F, 1e-5F);
 }
 
 TEST(Mat4, LookAtNegativeZ)
@@ -137,12 +169,40 @@ TEST(Mat4, LookAtNegativeX)
 {
     auto const actual = Math::Mat4f::look_at({ 3.0F, 0.0F, 0.0F }, { 0.0F, 0.0F, 0.0F }, { 0.0F, 1.0F, 0.0F });
     auto const expected = Math::Mat4f({
-         0.0F, 0.0F, -1.0F, 0.0F,
+         0.0F, 0.0F,  1.0F, 0.0F,
          0.0F, 1.0F,  0.0F, 0.0F,
-         1.0F, 0.0F,  0.0F, 0.0F,
+        -1.0F, 0.0F,  0.0F, 0.0F,
          0.0F, 0.0F, -3.0F, 1.0F
     });
     EXPECT_EQ(actual.elements(), expected.elements());
+}
+
+TEST(Mat4, LookAtMapsEyeAndTarget)
+{
+    Math::Vec3f const eye { 4.0F, 3.0F, -2.0F };
+    Math::Vec3f const target { -1.0F, 1.0F, 5.0F };
+    auto const view = Math::Mat4f::look_at(eye, target, { 0.0F, 1.0F, 0.0F });
+
+    auto const eye_in_view = view * Math::Vec4f(eye, 1.0F);
+    EXPECT_NEAR(eye_in_view.x, 0.0F, 1e-4F);
+    EXPECT_NEAR(eye_in_view.y, 0.0F, 1e-4F);
+    EXPECT_NEAR(eye_in_view.z, 0.0F, 1e-4F);
+
+    auto const target_in_view = view * Math::Vec4f(target, 1.0F);
+    EXPECT_NEAR(target_in_view.x, 0.0F, 1e-4F);
+    EXPECT_NEAR(target_in_view.y, 0.0F, 1e-4F);
+    EXPECT_NEAR(target_in_view.z, -(target - eye).length(), 1e-3F);
+}
+
+TEST(Mat4, LookAtPreservesHandedness)
+{
+    auto const view = Math::Mat4f::look_at({ 3.0F, 0.0F, 0.0F }, { 0.0F, 0.0F, 0.0F }, { 0.0F, 1.0F, 0.0F });
+
+    auto const on_positive_z = view * Math::Vec4f({ 0.0F, 0.0F, 1.0F }, 1.0F);
+    EXPECT_NEAR(on_positive_z.x, -1.0F, 1e-5F);
+
+    auto const above = view * Math::Vec4f({ 0.0F, 1.0F, 0.0F }, 1.0F);
+    EXPECT_NEAR(above.y, 1.0F, 1e-5F);
 }
 
 TEST(Mat4, FromQuaternionIdentity)
@@ -150,8 +210,35 @@ TEST(Mat4, FromQuaternionIdentity)
     auto quat = Math::Quatf::identity();
     auto mat = Math::Mat4f::from_quaternion(quat);
 
-    EXPECT_EQ(mat[0], 1.0F);
-    EXPECT_EQ(mat[5], 1.0F);
-    EXPECT_EQ(mat[10], 1.0F);
-    EXPECT_EQ(mat[15], 1.0F);
+    EXPECT_EQ(mat.elements(), Math::Mat4f::identity().elements());
+}
+
+TEST(Mat4, FromQuaternionRotatesLikeTheQuaternion)
+{
+    auto const quat = Math::Quatf::from_axis_angle({ 0.0F, 0.0F, 1.0F }, DEG_TO_RAD(90.0F));
+    auto const mat = Math::Mat4f::from_quaternion(quat);
+
+    auto const rotated = mat * Math::Vec4f({ 1.0F, 0.0F, 0.0F }, 1.0F);
+    EXPECT_NEAR(rotated.x, 0.0F, 1e-6F);
+    EXPECT_NEAR(rotated.y, 1.0F, 1e-6F);
+    EXPECT_NEAR(rotated.z, 0.0F, 1e-6F);
+
+    auto const by_quat = quat * Math::Vec3f(0.3F, -0.7F, 0.5F);
+    auto const by_mat = mat * Math::Vec4f({ 0.3F, -0.7F, 0.5F }, 1.0F);
+    EXPECT_NEAR(by_mat.x, by_quat.x, 1e-6F);
+    EXPECT_NEAR(by_mat.y, by_quat.y, 1e-6F);
+    EXPECT_NEAR(by_mat.z, by_quat.z, 1e-6F);
+}
+
+TEST(Mat4, TranslateMatchesMultiplication)
+{
+    auto const projection = Math::Mat4f::perspective(DEG_TO_RAD(60.0F), 1.5F, 0.1F, 100.0F);
+    Math::Vec3f const offset { 1.0F, -2.0F, 3.0F };
+
+    auto const translated = projection.translate(offset);
+    auto const multiplied = projection * Math::Mat4f::translation(offset);
+
+    for (size_t i = 0; i < 16; ++i) {
+        EXPECT_NEAR(translated[i], multiplied[i], 1e-5F) << "element " << i;
+    }
 }

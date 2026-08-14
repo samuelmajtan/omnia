@@ -6,17 +6,14 @@
 
 #pragma once
 
+#include <variant>
+
 #include <Common/Noncopyable.h>
 #include <Common/Types.h>
 #include <LibMath/Math.h>
 #include <LibRenderer/Export.h>
 
 namespace Renderer {
-
-enum class ProjectionType {
-    Perspective = 0,
-    Orthographic
-};
 
 class RENDERER_API Camera final {
     OA_MAKE_DEFAULT_CONSTRUCTIBLE(Camera);
@@ -30,20 +27,25 @@ public:
     };
 
     struct OrthographicConfiguration {
+        f32 aspect_ratio {};
+        f32 vertical_extent {};
+        f32 near_plane {};
+        f32 far_plane {};
     };
+
+    using ProjectionConfiguration = std::variant<PerspectiveConfiguration, OrthographicConfiguration>;
 
     struct Configuration {
-        ProjectionType projection_type {};
+        ProjectionConfiguration projection { PerspectiveConfiguration {} };
         Math::Vec3f position {};
-        union {
-            PerspectiveConfiguration perspective;
-            OrthographicConfiguration orthographic;
-        };
+        Math::Quatf orientation {};
     };
 
-    Camera(Configuration const& config);
+    explicit Camera(Configuration const& config);
 
     auto position() const -> Math::Vec3f const&;
+    auto orientation() const -> Math::Quatf const&;
+    auto configuration() const -> ProjectionConfiguration const&;
     auto projection() const -> Math::Mat4f const&;
     auto view() const -> Math::Mat4f const&;
 
@@ -53,12 +55,15 @@ public:
 
     void rotate(f32 pitch_degrees, f32 yaw_degrees, f32 roll_degrees);
     void translate(Math::Vec3f const& translation);
+    void set_position(Math::Vec3f const& position);
     void set_aspect_ratio(f32 aspect_ratio);
 private:
+    void update_projection();
+    void update_view();
+
     Configuration m_config {};
-    Math::Quatf m_orientation;
-    Math::Mat4f m_projection;
-    Math::Mat4f m_view;
+    Math::Mat4f m_projection {};
+    Math::Mat4f m_view {};
 };
 
 }

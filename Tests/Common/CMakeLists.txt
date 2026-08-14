@@ -4,6 +4,7 @@ set(SOURCES
     Hash.test.cpp
     Random.test.cpp
     String.test.cpp
+    Time.test.cpp
     UUID.test.cpp
 )
 

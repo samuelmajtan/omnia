@@ -102,8 +102,7 @@ auto VkBuffer::upload_data() -> Common::Expected<void>
         return {};
     }
 
-    VkStagingBuffer staging_buffer;
-    TRY_ASSIGN(staging_buffer, VkStagingBuffer::create(m_device, m_config.size));
+    auto const staging_buffer = TRY(VkStagingBuffer::create(m_device, m_config.size));
     std::memcpy(staging_buffer.allocation_info().pMappedData, m_config.data, static_cast<std::size_t>(m_config.size));
 
     VkBufferCopy const copy_region {

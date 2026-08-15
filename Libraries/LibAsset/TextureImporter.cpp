@@ -27,13 +27,12 @@ auto TextureImporter::import(ImportContext const& context) -> Common::Expected<T
         return OA_ERROR("Unsupported texture file extension '{}'", extension);
     }
 
-    std::vector<std::byte> file_content_value;
-    TRY_ASSIGN(file_content_value, File::read_binary(path));
+    auto const file_content = TRY(File::read_binary(path));
 
     i32 width = 0;
     i32 height = 0;
     i32 channels = 0;
-    auto* data = stbi_load_from_memory(reinterpret_cast<stbi_uc const*>(file_content_value.data()), static_cast<i32>(file_content_value.size()), &width, &height, &channels, 4);
+    auto* data = stbi_load_from_memory(reinterpret_cast<stbi_uc const*>(file_content.data()), static_cast<i32>(file_content.size()), &width, &height, &channels, 4);
     if (data == nullptr) {
         return OA_ERROR("Failed to load texture from file '{}'", path.string());
     }

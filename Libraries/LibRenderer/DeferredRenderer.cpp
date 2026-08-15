@@ -91,7 +91,7 @@ void DeferredRenderer::submit(SubmitInfo const& submit_info) const
 
 auto DeferredRenderer::resize(u32 width, u32 height) -> Common::Expected<void>
 {
-    TRY_ASSIGN(m_gbuffer, create_gbuffer_textures(width, height));
+    m_gbuffer = TRY(create_gbuffer_textures(width, height));
 
     m_lighting_resource_set->set_texture(0, m_gbuffer.normal.get());
     m_lighting_resource_set->set_texture(1, m_gbuffer.albedo.get());
@@ -112,12 +112,12 @@ auto DeferredRenderer::create_gbuffer_textures(u32 width, u32 height) -> Common:
         .usage = RHI::TextureUsage::ColorAttachment | RHI::TextureUsage::Sampled,
         .data = {}
     };
-    TRY_ASSIGN(gbuffer.normal, m_device->create_texture(gbuffer_texture_config));
+    gbuffer.normal = TRY(m_device->create_texture(gbuffer_texture_config));
 
     gbuffer_texture_config.format = RHI::TextureFormat::R8G8B8A8_UNORM;
-    TRY_ASSIGN(gbuffer.albedo, m_device->create_texture(gbuffer_texture_config));
-    TRY_ASSIGN(gbuffer.material, m_device->create_texture(gbuffer_texture_config));
-    TRY_ASSIGN(gbuffer.emissive, m_device->create_texture(gbuffer_texture_config));
+    gbuffer.albedo = TRY(m_device->create_texture(gbuffer_texture_config));
+    gbuffer.material = TRY(m_device->create_texture(gbuffer_texture_config));
+    gbuffer.emissive = TRY(m_device->create_texture(gbuffer_texture_config));
 
     RHI::Texture::Configuration const depth_texture_config {
         .width = width,
@@ -126,7 +126,7 @@ auto DeferredRenderer::create_gbuffer_textures(u32 width, u32 height) -> Common:
         .usage = RHI::TextureUsage::DepthStencil | RHI::TextureUsage::Sampled,
         .data = {}
     };
-    TRY_ASSIGN(gbuffer.depth, m_device->create_texture(depth_texture_config));
+    gbuffer.depth = TRY(m_device->create_texture(depth_texture_config));
 
     RHI::RenderTarget::Configuration const geometry_render_target_config {
         .render_pass = m_geometry_render_pass.get(),
@@ -140,7 +140,7 @@ auto DeferredRenderer::create_gbuffer_textures(u32 width, u32 height) -> Common:
         .width = width,
         .height = height
     };
-    TRY_ASSIGN(gbuffer.render_target, m_device->create_render_target(geometry_render_target_config));
+    gbuffer.render_target = TRY(m_device->create_render_target(geometry_render_target_config));
 
     return gbuffer;
 }
@@ -148,16 +148,16 @@ auto DeferredRenderer::create_gbuffer_textures(u32 width, u32 height) -> Common:
 auto DeferredRenderer::create_resources(Configuration const& config) -> Common::Expected<void>
 {
     // --- Shaders --- //
-    TRY_ASSIGN(m_geometry_vertex_shader, config.resource_manager->load_shader("Shaders/GeometryPass.vs"));
-    TRY_ASSIGN(m_geometry_fragment_shader, config.resource_manager->load_shader("Shaders/GeometryPass.fs"));
+    m_geometry_vertex_shader = TRY(config.resource_manager->load_shader("Shaders/GeometryPass.vs"));
+    m_geometry_fragment_shader = TRY(config.resource_manager->load_shader("Shaders/GeometryPass.fs"));
 
-    TRY_ASSIGN(m_lighting_vertex_shader, config.resource_manager->load_shader("Shaders/LightingPass.vs"));
-    TRY_ASSIGN(m_lighting_fragment_shader, config.resource_manager->load_shader("Shaders/LightingPass.fs"));
+    m_lighting_vertex_shader = TRY(config.resource_manager->load_shader("Shaders/LightingPass.vs"));
+    m_lighting_fragment_shader = TRY(config.resource_manager->load_shader("Shaders/LightingPass.fs"));
 
-    TRY_ASSIGN(m_shadow_vertex_shader, config.resource_manager->load_shader("Shaders/ShadowPass.vs"));
+    m_shadow_vertex_shader = TRY(config.resource_manager->load_shader("Shaders/ShadowPass.vs"));
 
     // --- Textures --- //
-    TRY_ASSIGN(m_gbuffer, create_gbuffer_textures(config.render_target_width, config.render_target_height));
+    m_gbuffer = TRY(create_gbuffer_textures(config.render_target_width, config.render_target_height));
 
     RHI::Texture::Configuration const shadow_depth_texture_config {
         .width = m_shadow_map_size,
@@ -166,7 +166,7 @@ auto DeferredRenderer::create_resources(Configuration const& config) -> Common::
         .usage = RHI::TextureUsage::DepthStencil | RHI::TextureUsage::Sampled,
         .data = {}
     };
-    TRY_ASSIGN(m_shadow_map, config.device->create_texture(shadow_depth_texture_config));
+    m_shadow_map = TRY(config.device->create_texture(shadow_depth_texture_config));
 
     RHI::RenderTarget::Configuration const shadow_render_target_config {
        .render_pass = m_shadow_render_pass.get(),
@@ -175,7 +175,7 @@ auto DeferredRenderer::create_resources(Configuration const& config) -> Common::
        .width = m_shadow_map_size,
        .height = m_shadow_map_size
     };
-    TRY_ASSIGN(m_shadow_render_target, config.device->create_render_target(shadow_render_target_config));
+    m_shadow_render_target = TRY(config.device->create_render_target(shadow_render_target_config));
 
     // --- Resource Layouts and Sets --- //
     RHI::ResourceLayout::Configuration const lighting_resource_layout_config {
@@ -187,8 +187,8 @@ auto DeferredRenderer::create_resources(Configuration const& config) -> Common::
             { .binding = 4, .type = RHI::ResourceType::Texture, .stage = Graphics::ShaderStage::Fragment }, // Depth
         }
     };
-    TRY_ASSIGN(m_lighting_resource_layout, config.device->create_resource_layout(lighting_resource_layout_config));
-    TRY_ASSIGN(m_lighting_resource_set, config.device->create_resource_set({ .layout = m_lighting_resource_layout.get() }));
+    m_lighting_resource_layout = TRY(config.device->create_resource_layout(lighting_resource_layout_config));
+    m_lighting_resource_set = TRY(config.device->create_resource_set({ .layout = m_lighting_resource_layout.get() }));
 
     m_lighting_resource_set->set_texture(0, m_gbuffer.normal.get());
     m_lighting_resource_set->set_texture(1, m_gbuffer.albedo.get());
@@ -207,7 +207,7 @@ auto DeferredRenderer::create_resources(Configuration const& config) -> Common::
         },
         .border_color = RHI::BorderColor::OpaqueWhite
     };
-    TRY_ASSIGN(m_shadow_sampler, config.device->create_sampler(shadow_sampler_config));
+    m_shadow_sampler = TRY(config.device->create_sampler(shadow_sampler_config));
 
     RHI::ResourceLayout::Configuration const shadow_resource_layout_config {
         .bindings = {
@@ -215,8 +215,8 @@ auto DeferredRenderer::create_resources(Configuration const& config) -> Common::
             { .binding = 1, .type = RHI::ResourceType::Texture, .stage = Graphics::ShaderStage::Fragment }
         }
     };
-    TRY_ASSIGN(m_shadow_resource_layout, config.device->create_resource_layout(shadow_resource_layout_config));
-    TRY_ASSIGN(m_shadow_resource_set, config.device->create_resource_set({ .layout = m_shadow_resource_layout.get() }));
+    m_shadow_resource_layout = TRY(config.device->create_resource_layout(shadow_resource_layout_config));
+    m_shadow_resource_set = TRY(config.device->create_resource_set({ .layout = m_shadow_resource_layout.get() }));
     m_shadow_resource_set->set_sampler(0, m_shadow_sampler.get());
     m_shadow_resource_set->set_depth_texture(1, m_shadow_map.get());
 
@@ -225,7 +225,7 @@ auto DeferredRenderer::create_resources(Configuration const& config) -> Common::
         .size = sizeof(FrameData),
         .usage = RHI::BufferUsage::Uniform
     };
-    TRY_ASSIGN(m_frame_uniform_buffer, config.device->create_buffer(frame_uniform_buffer_config));
+    m_frame_uniform_buffer = TRY(config.device->create_buffer(frame_uniform_buffer_config));
 
     RHI::ResourceLayout::Configuration const frame_resource_layout_config {
         .bindings = {
@@ -241,7 +241,7 @@ auto DeferredRenderer::create_resources(Configuration const& config) -> Common::
             }
         }
     };
-    TRY_ASSIGN(m_frame_resource_layout, config.device->create_resource_layout(frame_resource_layout_config));
+    m_frame_resource_layout = TRY(config.device->create_resource_layout(frame_resource_layout_config));
 
     RHI::Sampler::Configuration const frame_default_sampler_config {
         .mag_filter = RHI::Filter::Linear,
@@ -252,12 +252,12 @@ auto DeferredRenderer::create_resources(Configuration const& config) -> Common::
             .w = RHI::AddressMode::Repeat
         }
     };
-    TRY_ASSIGN(m_frame_default_sampler, config.device->create_sampler(frame_default_sampler_config));
+    m_frame_default_sampler = TRY(config.device->create_sampler(frame_default_sampler_config));
 
     RHI::ResourceSet::Configuration const frame_resource_set_config {
         .layout = m_frame_resource_layout.get(),
     };
-    TRY_ASSIGN(m_frame_resource_set, config.device->create_resource_set(frame_resource_set_config));
+    m_frame_resource_set = TRY(config.device->create_resource_set(frame_resource_set_config));
     m_frame_resource_set->set_sampler(0, m_frame_default_sampler.get());
     m_frame_resource_set->set_uniform_buffer(1, m_frame_uniform_buffer.get());
 
@@ -285,7 +285,7 @@ auto DeferredRenderer::create_passes(Configuration const& config) -> Common::Exp
             .final_layout = RHI::ImageLayout::DepthReadOnly
         }
     };
-    TRY_ASSIGN(m_shadow_render_pass, config.device->create_render_pass(shadow_render_pass_config));
+    m_shadow_render_pass = TRY(config.device->create_render_pass(shadow_render_pass_config));
 
     // --- Geometry Pass --- //
     constexpr RHI::RenderPass::Attachment const color_attachment_config {
@@ -320,7 +320,7 @@ auto DeferredRenderer::create_passes(Configuration const& config) -> Common::Exp
             .final_layout = RHI::ImageLayout::DepthReadOnly
         }
     };
-    TRY_ASSIGN(m_geometry_render_pass, config.device->create_render_pass(geometry_render_pass_config));
+    m_geometry_render_pass = TRY(config.device->create_render_pass(geometry_render_pass_config));
 
     // --- Lighting Pass --- //
     RHI::RenderPass::Configuration const lighting_render_pass {
@@ -336,7 +336,7 @@ auto DeferredRenderer::create_passes(Configuration const& config) -> Common::Exp
         },
         .depth_attachment = std::nullopt
     };
-    TRY_ASSIGN(m_lighting_render_pass, config.device->create_render_pass(lighting_render_pass));
+    m_lighting_render_pass = TRY(config.device->create_render_pass(lighting_render_pass));
     return {};
 }
 
@@ -369,7 +369,7 @@ auto DeferredRenderer::create_pipelines(Configuration const& config) -> Common::
         .resource_layouts = { m_frame_resource_layout.get() },
         .push_constants = { m_model_push_constant }
     };
-    TRY_ASSIGN(m_shadow_pipeline, config.device->create_pipeline(shadow_pipeline_config));
+    m_shadow_pipeline = TRY(config.device->create_pipeline(shadow_pipeline_config));
 
     // --- Geometry Pipeline --- //
     RHI::Pipeline::VertexBinding const vertex_binding_config {
@@ -401,7 +401,7 @@ auto DeferredRenderer::create_pipelines(Configuration const& config) -> Common::
         .resource_layouts = { m_frame_resource_layout.get(), config.resource_manager->resource_layout() },
         .push_constants = { m_model_push_constant }
     };
-    TRY_ASSIGN(m_geometry_pipeline, config.device->create_pipeline(geometry_pipeline_config));
+    m_geometry_pipeline = TRY(config.device->create_pipeline(geometry_pipeline_config));
 
     // --- Lighting Pipeline --- //
     RHI::Pipeline::Configuration const lighting_pipeline_config {
@@ -420,7 +420,7 @@ auto DeferredRenderer::create_pipelines(Configuration const& config) -> Common::
         .color_blend_attachments = { {} },
         .resource_layouts = { m_frame_resource_layout.get(), m_lighting_resource_layout.get(), m_shadow_resource_layout.get() },
     };
-    TRY_ASSIGN(m_lighting_pipeline, config.device->create_pipeline(lighting_pipeline_config));
+    m_lighting_pipeline = TRY(config.device->create_pipeline(lighting_pipeline_config));
 
     return {};
 }

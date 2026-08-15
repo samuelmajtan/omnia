@@ -138,8 +138,7 @@ inline auto write_binary(std::filesystem::path const& path, std::span<std::byte 
 
 inline auto hash_file(std::filesystem::path const& path) -> Common::Expected<u64>
 {
-    std::vector<std::byte> contents;
-    TRY_ASSIGN(contents, File::read_binary(path));
+    auto const contents = TRY(File::read_binary(path));
     return Hash::fnv1a(contents);
 }
 

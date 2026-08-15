@@ -24,32 +24,22 @@ void AssetFileHeader::write(Binary::ByteWriter& writer) const
 
 auto AssetFileHeader::read(Binary::ByteReader& reader) -> Common::Expected<AssetFileHeader>
 {
-    u64 file_magic {};
-    TRY_ASSIGN(file_magic, reader.read<u64>());
+    auto file_magic = TRY(reader.read<u64>());
     if (file_magic != MAGIC) {
         return OA_ERROR("Not an Omnia asset file (bad magic)");
     }
 
-    u32 format_version {};
-    TRY_ASSIGN(format_version, reader.read<u32>());
+    auto format_version = TRY(reader.read<u32>());
     if (format_version != VERSION) {
         return OA_ERROR("Cooked with asset format version {}, this build is {}", format_version, VERSION);
     }
 
-    AssetType asset_type {};
-    TRY_ASSIGN(asset_type, reader.read_enum<AssetType>(AssetType::Model, AssetType::Shader));
+    auto asset_type = TRY(reader.read_enum<AssetType>(AssetType::Model, AssetType::Shader));
+    auto importer_version = TRY(reader.read<u32>());
+    auto compression = TRY(reader.read_enum<CompressionMode>(CompressionMode::None, CompressionMode::None));
+    auto source_hash = TRY(reader.read<u64>());
+    auto payload_size = TRY(reader.read<u64>());
 
-    u32 importer_version {};
-    TRY_ASSIGN(importer_version, reader.read<u32>());
-
-    CompressionMode compression {};
-    TRY_ASSIGN(compression, reader.read_enum<CompressionMode>(CompressionMode::None, CompressionMode::None));
-
-    u64 source_hash {};
-    TRY_ASSIGN(source_hash, reader.read<u64>());
-
-    u64 payload_size {};
-    TRY_ASSIGN(payload_size, reader.read<u64>());
     if (payload_size > reader.remaining()) {
         return OA_ERROR("Truncated asset file: header declares a {} byte payload, {} bytes present", payload_size, reader.remaining());
     }

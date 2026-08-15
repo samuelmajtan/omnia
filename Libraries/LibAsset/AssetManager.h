@@ -56,8 +56,7 @@ public:
     template<AssetData T>
     auto import(AssetID id) const -> Common::Expected<T>
     {
-        AssetEntry entry;
-        TRY_ASSIGN(entry, m_asset_registry.resolve(id));
+        auto entry = TRY(m_asset_registry.resolve(id));
         return import_entry<T>(entry, false);
     }
 
@@ -81,8 +80,7 @@ private:
 
         auto const context = context_for(entry, source->path);
 
-        u64 hash {};
-        TRY_ASSIGN(hash, AssetTraits<T>::source_hash(context));
+        auto hash = TRY(AssetTraits<T>::source_hash(context));
         auto const source_hash = entry.sidecar.hash_settings(hash);
 
         if (!force) {
@@ -91,9 +89,7 @@ private:
             }
         }
 
-        T value {};
-        TRY_ASSIGN(value, AssetTraits<T>::import(context));
-
+        auto value = TRY(AssetTraits<T>::import(context));
         TRY(write_cooked_asset<T>(entry, value, source_hash));
         return value;
     }

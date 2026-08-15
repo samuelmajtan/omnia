@@ -46,8 +46,7 @@ auto ResourceManager::create(Asset::AssetManager const* asset_manager, RHI::Devi
         );
     }
 
-    TRY_ASSIGN(resource_manager->m_material_resource_layout, device->create_resource_layout(material_resource_layout_config));
-
+    resource_manager->m_material_resource_layout = TRY(device->create_resource_layout(material_resource_layout_config));
     TRY(resource_manager->initialize_default_resources());
     return resource_manager;
 }
@@ -72,8 +71,7 @@ auto ResourceManager::load_model(Asset::AssetID asset_id) -> Common::Expected<Mo
         return it->second.get();
     }
 
-    Asset::ModelData model_data {};
-    TRY_ASSIGN(model_data, m_asset_manager->import<Asset::ModelData>(asset_id));
+    auto const model_data = TRY(m_asset_manager->import<Asset::ModelData>(asset_id));
 
     auto resolve_texture = [&](std::optional<Asset::AssetID> const& texture_id, Asset::AssetID default_id) -> RHI::Texture const* {
         assert(m_texture_cache.contains(default_id));
@@ -112,7 +110,7 @@ auto ResourceManager::load_model(Asset::AssetID asset_id) -> Common::Expected<Mo
         model_config.materials.push_back(std::move(material_config));
     }
 
-    TRY_ASSIGN(m_model_cache[asset_id], Model::create(model_config, m_device));
+    m_model_cache[asset_id] = TRY(Model::create(model_config, m_device));
     return m_model_cache[asset_id].get();
 }
 
@@ -131,9 +129,8 @@ auto ResourceManager::load_shader(Asset::AssetID asset_id) -> Common::Expected<R
         return it->second.get();
     }
 
-    RHI::Shader::Configuration shader_data {};
-    TRY_ASSIGN(shader_data, m_asset_manager->import<RHI::Shader::Configuration>(asset_id));
-    TRY_ASSIGN(m_shader_cache[asset_id], m_device->create_shader(shader_data));
+    auto const shader_data = TRY(m_asset_manager->import<RHI::Shader::Configuration>(asset_id));
+    m_shader_cache[asset_id] = TRY(m_device->create_shader(shader_data));
     return m_shader_cache[asset_id].get();
 }
 
@@ -152,9 +149,7 @@ auto ResourceManager::load_texture(Asset::AssetID asset_id, RHI::TextureFormat f
         return it->second.get();
     }
 
-    Asset::TextureData texture_data {};
-    TRY_ASSIGN(texture_data, m_asset_manager->import<Asset::TextureData>(asset_id));
-
+    auto const texture_data = TRY(m_asset_manager->import<Asset::TextureData>(asset_id));
     RHI::Texture::Configuration const texture_config {
         .width = texture_data.width,
         .height = texture_data.height,
@@ -163,7 +158,7 @@ auto ResourceManager::load_texture(Asset::AssetID asset_id, RHI::TextureFormat f
         .data = texture_data.data
     };
 
-    TRY_ASSIGN(m_texture_cache[asset_id], m_device->create_texture(texture_config));
+    m_texture_cache[asset_id] = TRY(m_device->create_texture(texture_config));
     return m_texture_cache[asset_id].get();
 }
 
@@ -218,7 +213,7 @@ auto ResourceManager::initialize_default_resources() -> Common::Expected<void>
             continue;
         }
 
-        TRY_ASSIGN(m_texture_cache[asset_id], m_device->create_texture(texture_config));
+        m_texture_cache[asset_id] = TRY(m_device->create_texture(texture_config));
     }
     return {};
 }

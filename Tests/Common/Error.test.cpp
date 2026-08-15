@@ -25,8 +25,7 @@ constexpr u32 FAILING_LEAF_LINE = __LINE__ - 3;
 
 auto propagates_value() -> Expected<u32>
 {
-    u32 value {};
-    TRY_ASSIGN(value, failing_leaf());
+    auto value = TRY(failing_leaf());
     return value;
 }
 
@@ -38,8 +37,7 @@ auto propagates_void() -> Expected<void>
 
 auto propagates_twice() -> Expected<u32>
 {
-    u32 value {};
-    TRY_ASSIGN(value, propagates_value());
+    auto value = TRY(propagates_value());
     return value;
 }
 

@@ -296,8 +296,7 @@ auto VkSwapchain::create_images() -> Common::Expected<void>
             return OA_ERROR("Failed to create Vulkan swapchain image view: {}", string_VkResult(result));
         }
 
-        std::unique_ptr<VkTexture> texture;
-        TRY_ASSIGN(texture, VkTexture::create_borrowed(texture_config, m_device, image, image_view));
+        auto texture = TRY(VkTexture::create_borrowed(texture_config, m_device, image, image_view));
         m_textures.push_back(std::move(texture));
     }
 
@@ -308,8 +307,7 @@ auto VkSwapchain::create_command_buffers() -> Common::Expected<void>
 {
     m_command_buffers.reserve(m_config.frames_in_flight);
     for (i32 i = 0; i < m_config.frames_in_flight; i++) {
-        VkCommandBuffer command_buffer;
-        TRY_ASSIGN(command_buffer, VkCommandBuffer::create(m_device->graphics_pool(), m_device));
+        auto command_buffer = TRY(VkCommandBuffer::create(m_device->graphics_pool(), m_device));
         m_command_buffers.push_back(std::move(command_buffer));
     }
 

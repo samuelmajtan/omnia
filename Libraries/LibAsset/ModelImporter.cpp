@@ -46,8 +46,7 @@ auto ModelImporter::import_gltf(ImportContext const& context) -> Common::Expecte
 {
     auto const& path = context.path;
     auto const* asset_registry = context.registry;
-    std::string file_data;
-    TRY_ASSIGN(file_data, File::read_all(path));
+    auto const file_data = TRY(File::read_all(path));
 
     cgltf_options const options {};
     cgltf_data* data = nullptr;

@@ -453,8 +453,7 @@ auto VkDevice::create_command_pools() -> Common::Expected<void>
         return OA_ERROR("Failed to create Vulkan graphics command pool: {}", string_VkResult(result));
     }
 
-    TRY_ASSIGN(m_graphics_command_buffer, VkCommandBuffer::create(m_graphics_command_pool, this));
-
+    m_graphics_command_buffer = TRY(VkCommandBuffer::create(m_graphics_command_pool, this));
     return {};
 }
 

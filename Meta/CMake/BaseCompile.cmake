@@ -4,6 +4,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "AppleClang|Clang|GNU")
     add_compile_options(-Wall -Wextra -Wpedantic -Wcast-qual -Wformat=2)
+    add_compile_options(-Wno-gnu-statement-expression)
 endif()
 
 if (OMNIA_ENABLE_WERROR AND CMAKE_CXX_COMPILER_ID MATCHES "AppleClang|Clang|GNU")

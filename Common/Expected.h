@@ -13,6 +13,7 @@
 #include <source_location>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <utility>
 
 namespace Common {
@@ -52,6 +53,14 @@ inline auto operator<<(std::ostream& stream, Error const& error) -> std::ostream
 template<typename T>
 using Expected = std::expected<T, Error>;
 
+template<typename T, typename E>
+constexpr inline auto unwrap(std::expected<T, E>&& expected) -> T
+{
+    if constexpr (!std::is_void_v<T>) {
+        return std::move(expected).value();
+    }
+}
+
 }
 
 template<>
@@ -65,21 +74,11 @@ struct std::formatter<Common::Error> : std::formatter<std::string> {
 #define OA_ERROR(...) \
     (::std::unexpected(::Common::Error(::std::format(__VA_ARGS__), ::std::source_location::current())))
 
-#define TRY(expected)                                              \
-    {                                                              \
-        auto result = (expected);                                  \
-        if (!result.has_value()) {                                 \
-            return ::std::unexpected(::std::move(result).error()); \
-        }                                                          \
-    }                                                              \
-    (void)0
-
-#define TRY_ASSIGN(lhs, expected)                                  \
-    {                                                              \
-        auto result = (expected);                                  \
-        if (!result.has_value()) {                                 \
-            return ::std::unexpected(::std::move(result).error()); \
-        }                                                          \
-        lhs = ::std::move(result).value();                         \
-    }                                                              \
-    (void)0
+#define TRY(expected)                                               \
+    ({                                                              \
+        auto result = (expected);                                   \
+        if (!result.has_value()) {                                  \
+            return ::std::unexpected(::std::move(result).error());  \
+        }                                                           \
+        ::Common::unwrap(::std::move(result));                      \
+    })

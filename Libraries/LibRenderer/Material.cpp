@@ -20,14 +20,14 @@ auto Material::create(Configuration const& configuration, RHI::Device* device) -
     auto resource_set_configuration = RHI::ResourceSet::Configuration {
         .layout = configuration.resource_layout,
     };
-    TRY_ASSIGN(material.m_resource_set, device->create_resource_set(resource_set_configuration));
+    material.m_resource_set = TRY(device->create_resource_set(resource_set_configuration));
 
     auto uniform_buffer_configuration = RHI::Buffer::Configuration {
         .size = sizeof(Graphics::MaterialParameters),
         .usage = RHI::BufferUsage::Uniform,
         .data = &material.m_parameters
     };
-    TRY_ASSIGN(material.m_uniform_buffer, device->create_buffer(uniform_buffer_configuration));
+    material.m_uniform_buffer = TRY(device->create_buffer(uniform_buffer_configuration));
 
     material.m_resource_set->set_uniform_buffer(0, material.m_uniform_buffer.get());
     material.m_resource_set->set_texture(1, configuration.albedo_texture);

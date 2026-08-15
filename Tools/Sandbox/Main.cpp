@@ -39,22 +39,22 @@ public:
             .width = 800,
             .height = 600
         };
-        TRY_ASSIGN(sandbox->m_window, Platform::Window::create(window_config));
+        sandbox->m_window = TRY(Platform::Window::create(window_config));
 
         RHI::Device::Configuration const device_config {
             .api = RHI::Device::API::Vulkan,
             .enable_debug_layer = true,
             .window = sandbox->m_window.get(),
         };
-        TRY_ASSIGN(sandbox->m_graphics_device, RHI::Device::create(device_config));
-        TRY_ASSIGN(sandbox->m_resource_manager, Renderer::ResourceManager::create(&sandbox->m_asset_manager, sandbox->m_graphics_device.get()));
+        sandbox->m_graphics_device = TRY(RHI::Device::create(device_config));
+        sandbox->m_resource_manager = TRY(Renderer::ResourceManager::create(&sandbox->m_asset_manager, sandbox->m_graphics_device.get()));
 
         RHI::Swapchain::Configuration const swapchain_config {
             .width = static_cast<u32>(window_config.width),
             .height = static_cast<u32>(window_config.height),
             .frames_in_flight = 2
         };
-        TRY_ASSIGN(sandbox->m_swapchain, sandbox->m_graphics_device->create_swapchain(swapchain_config));
+        sandbox->m_swapchain = TRY(sandbox->m_graphics_device->create_swapchain(swapchain_config));
 
         Renderer::DeferredRenderer::Configuration const deferred_renderer_config {
             .render_target_width = swapchain_config.width,
@@ -63,7 +63,7 @@ public:
             .device = sandbox->m_graphics_device.get(),
             .resource_manager = sandbox->m_resource_manager.get(),
         };
-        TRY_ASSIGN(sandbox->m_deferred_renderer, Renderer::DeferredRenderer::create(deferred_renderer_config));
+        sandbox->m_deferred_renderer = TRY(Renderer::DeferredRenderer::create(deferred_renderer_config));
 
         Renderer::Camera::Configuration const camera_config {
             .projection = Renderer::Camera::PerspectiveConfiguration {
@@ -76,7 +76,7 @@ public:
         };
         sandbox->m_camera = Renderer::Camera(camera_config);
 
-        TRY_ASSIGN(sandbox->m_sponza, sandbox->m_resource_manager->load_model("Models/sponza/Sponza"));
+        sandbox->m_sponza = TRY(sandbox->m_resource_manager->load_model("Models/sponza/Sponza"));
 
         TRY(sandbox->create_swapchain_render_targets());
 
@@ -105,7 +105,7 @@ public:
         auto const& swapchain_textures = m_swapchain->textures();
         m_swapchain_render_targets.resize(swapchain_textures.size());
         for (auto const& [index, texture] : std::views::enumerate(swapchain_textures)) {
-            TRY_ASSIGN(m_swapchain_render_targets[index], m_deferred_renderer->create_output_render_target(texture.get()));
+            m_swapchain_render_targets[index] = TRY(m_deferred_renderer->create_output_render_target(texture.get()));
         }
         return {};
     }

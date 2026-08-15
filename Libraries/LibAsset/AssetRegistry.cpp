@@ -51,7 +51,7 @@ auto AssetRegistry::scan() -> Common::Expected<void>
         AssetSidecar sidecar;
 
         if (std::filesystem::exists(sidecar_path)) {
-            TRY_ASSIGN(sidecar, AssetSidecar::load(sidecar_path));
+            sidecar = TRY(AssetSidecar::load(sidecar_path));
         } else {
             sidecar = AssetSidecar(Common::UUID::generate(), type.value());
             TRY(sidecar.save(sidecar_path));

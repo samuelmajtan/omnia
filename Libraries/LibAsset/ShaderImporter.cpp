@@ -96,16 +96,10 @@ auto ShaderImporter::import(ImportContext const& context) -> Common::Expected<Sh
     ShaderData shader_data;
     shader_data.stage = shader_stage;
 
-    std::string file_content;
-    TRY_ASSIGN(file_content, File::read_all(path));
+    auto const file_content = TRY(File::read_all(path));
 
-    {
-        Graphics::ShaderVariant spirv_variant;
-        spirv_variant.format = Graphics::ShaderFormat::SPIRV;
-
-        TRY_ASSIGN(spirv_variant.bytecode, ShaderCompiler::compile_spirv(path, file_content, shader_stage));
-        shader_data.variants.push_back(spirv_variant);
-    }
+    auto spirv_bytecode = TRY(ShaderCompiler::compile_spirv(path, file_content, shader_stage));
+    shader_data.variants.emplace_back(Graphics::ShaderFormat::SPIRV, std::move(spirv_bytecode));
 
     return shader_data;
 }
@@ -114,8 +108,7 @@ auto ShaderImporter::source_hash(ImportContext const& context) -> Common::Expect
 {
     auto const& path = context.path;
 
-    u64 hash {};
-    TRY_ASSIGN(hash, File::hash_file(path));
+    auto hash = TRY(File::hash_file(path));
 
     // Changing the contents of an included file should also change the hash of the top-level shader.
     std::set<std::filesystem::path> includes;
@@ -124,8 +117,7 @@ auto ShaderImporter::source_hash(ImportContext const& context) -> Common::Expect
     for (auto const& include : includes) {
         hash = Hash::fnv1a(include.generic_string(), hash);
 
-        std::vector<std::byte> contents;
-        TRY_ASSIGN(contents, File::read_binary(include));
+        auto const contents = TRY(File::read_binary(include));
         hash = Hash::fnv1a(contents, hash);
     }
 

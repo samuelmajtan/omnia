@@ -107,9 +107,7 @@ public:
     template<Serializable T>
     auto read_vector() -> Common::Expected<std::vector<T>>
     {
-        u64 count {};
-        TRY_ASSIGN(count, read<u64>());
-
+        auto const count = TRY(read<u64>());
         if (count > remaining() / sizeof(T)) {
             return OA_ERROR("Truncated stream: wanted {} elements of {} bytes, {} remaining", count, sizeof(T), remaining());
         }
@@ -122,13 +120,10 @@ public:
         return values;
     }
 
-    template<typename Enum>
-    requires std::is_enum_v<Enum>
+    template<typename Enum> requires std::is_enum_v<Enum>
     auto read_enum(Enum lowest, Enum highest) -> Common::Expected<Enum>
     {
-        u8 value {};
-        TRY_ASSIGN(value, read<u8>());
-
+        auto const value = TRY(read<u8>());
         if (value < static_cast<u8>(lowest) || value > static_cast<u8>(highest)) {
             return OA_ERROR("Invalid enum value {} in stream, expected {} to {}", value, static_cast<u8>(lowest), static_cast<u8>(highest));
         }
@@ -137,9 +132,7 @@ public:
 
     auto read_string() -> Common::Expected<std::string>
     {
-        u64 length {};
-        TRY_ASSIGN(length, read<u64>());
-
+        auto const length = TRY(read<u64>());
         if (length > remaining()) {
             return OA_ERROR("Truncated stream: wanted a {} byte string, {} remaining", length, remaining());
         }
@@ -152,15 +145,12 @@ public:
     template<Serializable T>
     auto read_optional() -> Common::Expected<std::optional<T>>
     {
-        u8 present {};
-        TRY_ASSIGN(present, read<u8>());
-
+        auto const present = TRY(read<u8>());
         if (present == 0) {
             return std::optional<T> {};
         }
 
-        T value {};
-        TRY_ASSIGN(value, read<T>());
+        auto value = TRY(read<T>());
         return std::optional<T>(std::move(value));
     }
 

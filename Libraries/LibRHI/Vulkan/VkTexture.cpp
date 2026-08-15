@@ -73,8 +73,7 @@ auto VkTexture::create_owned(Configuration const& config, RHI::VkDevice const* d
     }
 
     if (!config.data.empty()) {
-        VkStagingBuffer staging_buffer;
-        TRY_ASSIGN(staging_buffer, VkStagingBuffer::create(device, config.data.size()));
+        auto const staging_buffer = TRY(VkStagingBuffer::create(device, config.data.size()));
         std::memcpy(staging_buffer.allocation_info().pMappedData, config.data.data(), config.data.size());
 
         VkBufferImageCopy const copy_region {

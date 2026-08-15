@@ -27,11 +27,7 @@ auto Model::create_sub_meshes(std::vector<SubMesh::Configuration> const& configu
 {
     m_sub_meshes.reserve(configurations.size());
     for (auto const& sub_mesh_configuration : configurations) {
-        auto sub_mesh = SubMesh::create(sub_mesh_configuration, device);
-        if (!sub_mesh.has_value()) {
-            return std::unexpected(std::move(sub_mesh).error());
-        }
-        m_sub_meshes.push_back(std::move(sub_mesh).value());
+        m_sub_meshes.push_back(TRY(SubMesh::create(sub_mesh_configuration, device)));
     }
     return {};
 }
@@ -40,11 +36,7 @@ auto Model::create_materials(std::vector<Material::Configuration> const& configu
 {
     m_materials.reserve(configurations.size());
     for (auto const& material_configuration : configurations) {
-        auto material = Material::create(material_configuration, device);
-        if (!material.has_value()) {
-            return std::unexpected(std::move(material).error());
-        }
-        m_materials.push_back(std::move(material).value());
+        m_materials.push_back(TRY(Material::create(material_configuration, device)));
     }
     return {};
 }

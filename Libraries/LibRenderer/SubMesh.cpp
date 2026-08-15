@@ -16,20 +16,16 @@ auto SubMesh::create(Configuration const& configuration, RHI::Device const* devi
         .usage = RHI::BufferUsage::Vertex,
         .data = configuration.vertices.data()
     };
-    std::unique_ptr<RHI::Buffer> vertex_buffer;
-    TRY_ASSIGN(vertex_buffer, device->create_buffer(vertex_buffer_config));
 
     RHI::Buffer::Configuration const index_buffer_config {
         .size = configuration.indices.size() * sizeof(Graphics::Index),
         .usage = RHI::BufferUsage::Index,
         .data = configuration.indices.data()
     };
-    std::unique_ptr<RHI::Buffer> index_buffer;
-    TRY_ASSIGN(index_buffer, device->create_buffer(index_buffer_config));
 
     SubMesh submesh;
-    submesh.m_vertex_buffer = std::move(vertex_buffer);
-    submesh.m_index_buffer = std::move(index_buffer);
+    submesh.m_vertex_buffer = TRY(device->create_buffer(vertex_buffer_config));
+    submesh.m_index_buffer = TRY(device->create_buffer(index_buffer_config));
     submesh.m_index_count = configuration.indices.size();
     submesh.m_material_index = configuration.material_index;
     return submesh;

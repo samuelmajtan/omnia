@@ -34,8 +34,7 @@ auto AssetSidecar::path_for(std::filesystem::path const& source_path) -> std::fi
 
 auto AssetSidecar::load(std::filesystem::path const& sidecar_path) -> Common::Expected<AssetSidecar>
 {
-    std::vector<std::string> lines;
-    TRY_ASSIGN(lines, File::read_lines(sidecar_path));
+    auto const lines = TRY(File::read_lines(sidecar_path));
 
     AssetSidecar sidecar;
     std::optional<AssetID> id;

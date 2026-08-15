@@ -12,6 +12,7 @@
 #include <string>
 #include <vector>
 
+#include <Common/Expected.h>
 #include <Common/Noncopyable.h>
 #include <Common/Types.h>
 #include <LibRHI/Forward.h>
@@ -45,7 +46,7 @@ public:
     virtual auto textures() const -> std::vector<std::unique_ptr<Texture>> const& = 0;
 
     virtual auto is_dirty() const -> bool = 0;
-    virtual auto recreate(Configuration const& config) -> std::expected<void, std::string> = 0;
+    virtual auto recreate(Configuration const& config) -> Common::Expected<void> = 0;
     virtual void wait_idle() const = 0;
     virtual auto begin_frame() -> std::optional<Frame> = 0;
     virtual void end_frame(Frame const& frame) = 0;

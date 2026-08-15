@@ -10,6 +10,7 @@
 #include <memory>
 #include <string>
 
+#include <Common/Expected.h>
 #include <Common/Noncopyable.h>
 #include <LibRHI/Shader.h>
 
@@ -20,7 +21,7 @@ class DX12Shader final : public Shader {
     OA_MAKE_NONMOVABLE(DX12Shader);
 
 public:
-    static auto create(Configuration const& config) -> std::expected<std::unique_ptr<DX12Shader>, std::string>;
+    static auto create(Configuration const& config) -> Common::Expected<std::unique_ptr<DX12Shader>>;
 
     ~DX12Shader() override;
 

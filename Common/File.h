@@ -22,37 +22,37 @@
 
 namespace File {
 
-inline auto read_all(std::filesystem::path const& path) -> std::expected<std::string, std::string>
+inline auto read_all(std::filesystem::path const& path) -> Common::Expected<std::string>
 {
     if (!std::filesystem::exists(path)) {
-        return std::unexpected(std::format("File does not exist: {}", path.string()));
+        return OA_ERROR("File does not exist: {}", path.string());
     }
 
     if (!std::filesystem::is_regular_file(path)) {
-        return std::unexpected(std::format("Path is not a regular file: {}", path.string()));
+        return OA_ERROR("Path is not a regular file: {}", path.string());
     }
 
     std::ifstream file(path);
     if (!file.is_open()) {
-        return std::unexpected(std::format("Failed to open file: {}", path.string()));
+        return OA_ERROR("Failed to open file: {}", path.string());
     }
 
     return std::string(std::istreambuf_iterator<char>(file), {});
 }
 
-inline auto read_lines(std::filesystem::path const& path) -> std::expected<std::vector<std::string>, std::string>
+inline auto read_lines(std::filesystem::path const& path) -> Common::Expected<std::vector<std::string>>
 {
     if (!std::filesystem::exists(path)) {
-        return std::unexpected(std::format("File does not exist: {}", path.string()));
+        return OA_ERROR("File does not exist: {}", path.string());
     }
 
     if (!std::filesystem::is_regular_file(path)) {
-        return std::unexpected(std::format("Path is not a regular file: {}", path.string()));
+        return OA_ERROR("Path is not a regular file: {}", path.string());
     }
 
     std::ifstream file(path);
     if (!file.is_open()) {
-        return std::unexpected(std::format("Failed to open file: {}", path.string()));
+        return OA_ERROR("Failed to open file: {}", path.string());
     }
 
     std::vector<std::string> lines;
@@ -65,19 +65,19 @@ inline auto read_lines(std::filesystem::path const& path) -> std::expected<std::
 }
 
 template<typename T = std::byte>
-inline auto read_binary(std::filesystem::path const& path) -> std::expected<std::vector<T>, std::string>
+inline auto read_binary(std::filesystem::path const& path) -> Common::Expected<std::vector<T>>
 {
     if (!std::filesystem::exists(path)) {
-        return std::unexpected(std::format("File does not exist: {}", path.string()));
+        return OA_ERROR("File does not exist: {}", path.string());
     }
 
     if (!std::filesystem::is_regular_file(path)) {
-        return std::unexpected(std::format("Path is not a regular file: {}", path.string()));
+        return OA_ERROR("Path is not a regular file: {}", path.string());
     }
 
     std::ifstream file(path, std::ios::binary | std::ios::ate);
     if (!file.is_open()) {
-        return std::unexpected(std::format("Failed to open file: {}", path.string()));
+        return OA_ERROR("Failed to open file: {}", path.string());
     }
 
     auto file_size = file.tellg();
@@ -85,64 +85,58 @@ inline auto read_binary(std::filesystem::path const& path) -> std::expected<std:
 
     std::vector<T> data(file_size / sizeof(T));
     if (!file.read(reinterpret_cast<char*>(data.data()), file_size)) {
-        return std::unexpected(std::format("Failed to read file: {}", path.string()));
+        return OA_ERROR("Failed to read file: {}", path.string());
     }
 
     return data;
 }
 
-inline auto create_parent_dir(std::filesystem::path const& path) -> std::expected<void, std::string>
+inline auto create_parent_dir(std::filesystem::path const& path) -> Common::Expected<void>
 {
     auto const parent = path.parent_path();
     if (parent.empty()) {
         return {};
     }
 
-
-
     std::error_code error;
     std::filesystem::create_directories(parent, error);
     if (error) {
-        return std::unexpected(std::format("Failed to create directory {}: {}", parent.string(), error.message()));
+        return OA_ERROR("Failed to create directory {}: {}", parent.string(), error.message());
     }
     return {};
 }
 
-inline auto write_all(std::filesystem::path const& path, std::string_view content) -> std::expected<void, std::string>
+inline auto write_all(std::filesystem::path const& path, std::string_view content) -> Common::Expected<void>
 {
-    if (auto result = create_parent_dir(path); !result.has_value()) {
-        return result;
-    }
+    TRY(create_parent_dir(path));
 
     std::ofstream file(path, std::ios::trunc);
     if (!file.is_open()) {
-        return std::unexpected(std::format("Failed to open file for writing: {}", path.string()));
+        return OA_ERROR("Failed to open file for writing: {}", path.string());
     }
 
     if (!file.write(content.data(), static_cast<std::streamsize>(content.size()))) {
-        return std::unexpected(std::format("Failed to write file: {}", path.string()));
+        return OA_ERROR("Failed to write file: {}", path.string());
     }
     return {};
 }
 
-inline auto write_binary(std::filesystem::path const& path, std::span<std::byte const> data) -> std::expected<void, std::string>
+inline auto write_binary(std::filesystem::path const& path, std::span<std::byte const> data) -> Common::Expected<void>
 {
-    if (auto result = create_parent_dir(path); !result.has_value()) {
-        return result;
-    }
+    TRY(create_parent_dir(path));
 
     std::ofstream file(path, std::ios::binary | std::ios::trunc);
     if (!file.is_open()) {
-        return std::unexpected(std::format("Failed to open file for writing: {}", path.string()));
+        return OA_ERROR("Failed to open file for writing: {}", path.string());
     }
 
     if (!data.empty() && !file.write(reinterpret_cast<char const*>(data.data()), static_cast<std::streamsize>(data.size()))) {
-        return std::unexpected(std::format("Failed to write file: {}", path.string()));
+        return OA_ERROR("Failed to write file: {}", path.string());
     }
     return {};
 }
 
-inline auto hash_file(std::filesystem::path const& path) -> std::expected<u64, std::string>
+inline auto hash_file(std::filesystem::path const& path) -> Common::Expected<u64>
 {
     std::vector<std::byte> contents;
     TRY_ASSIGN(contents, File::read_binary(path));

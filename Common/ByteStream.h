@@ -16,6 +16,7 @@
 #include <type_traits>
 #include <vector>
 
+#include <Common/Expected.h>
 #include <Common/Types.h>
 
 namespace Binary {
@@ -91,10 +92,10 @@ public:
     }
 
     template<Serializable T>
-    auto read() -> std::expected<T, std::string>
+    auto read() -> Common::Expected<T>
     {
         if (sizeof(T) > remaining()) {
-            return std::unexpected(std::format("Truncated stream: wanted {} bytes, {} remaining.", sizeof(T), remaining()));
+            return OA_ERROR("Truncated stream: wanted {} bytes, {} remaining", sizeof(T), remaining());
         }
 
         T value {};
@@ -104,72 +105,63 @@ public:
     }
 
     template<Serializable T>
-    auto read_vector() -> std::expected<std::vector<T>, std::string>
+    auto read_vector() -> Common::Expected<std::vector<T>>
     {
-        auto count = read<u64>();
-        if (!count.has_value()) {
-            return std::unexpected(std::move(count).error());
+        u64 count {};
+        TRY_ASSIGN(count, read<u64>());
+
+        if (count > remaining() / sizeof(T)) {
+            return OA_ERROR("Truncated stream: wanted {} elements of {} bytes, {} remaining", count, sizeof(T), remaining());
         }
 
-        if (count.value() > remaining() / sizeof(T)) {
-            return std::unexpected(std::format("Truncated stream: wanted {} elements of {} bytes, {} remaining.", count.value(), sizeof(T), remaining()));
-        }
-
-        std::vector<T> values(count.value());
-        if (count.value() > 0) {
-            std::memcpy(values.data(), m_data.data() + m_offset, count.value() * sizeof(T));
-            m_offset += count.value() * sizeof(T);
+        std::vector<T> values(count);
+        if (count > 0) {
+            std::memcpy(values.data(), m_data.data() + m_offset, count * sizeof(T));
+            m_offset += count * sizeof(T);
         }
         return values;
     }
 
-    template<typename Enum> requires std::is_enum_v<Enum>
-    auto read_enum(Enum lowest, Enum highest) -> std::expected<Enum, std::string>
+    template<typename Enum>
+    requires std::is_enum_v<Enum>
+    auto read_enum(Enum lowest, Enum highest) -> Common::Expected<Enum>
     {
-        auto const value = read<u8>();
-        if (!value.has_value()) {
-            return std::unexpected(std::move(value).error());
-        }
+        u8 value {};
+        TRY_ASSIGN(value, read<u8>());
 
-        if (value.value() < static_cast<u8>(lowest) || value.value() > static_cast<u8>(highest)) {
-            return std::unexpected(std::format("Invalid enum value {} in stream, expected {} to {}.", value.value(), static_cast<u8>(lowest), static_cast<u8>(highest)));
+        if (value < static_cast<u8>(lowest) || value > static_cast<u8>(highest)) {
+            return OA_ERROR("Invalid enum value {} in stream, expected {} to {}", value, static_cast<u8>(lowest), static_cast<u8>(highest));
         }
-        return static_cast<Enum>(value.value());
+        return static_cast<Enum>(value);
     }
 
-    auto read_string() -> std::expected<std::string, std::string>
+    auto read_string() -> Common::Expected<std::string>
     {
-        auto length = read<u64>();
-        if (!length.has_value()) {
-            return std::unexpected(std::move(length).error());
+        u64 length {};
+        TRY_ASSIGN(length, read<u64>());
+
+        if (length > remaining()) {
+            return OA_ERROR("Truncated stream: wanted a {} byte string, {} remaining", length, remaining());
         }
 
-        if (length.value() > remaining()) {
-            return std::unexpected(std::format("Truncated stream: wanted a {} byte string, {} remaining.", length.value(), remaining()));
-        }
-
-        std::string value(reinterpret_cast<char const*>(m_data.data() + m_offset), length.value());
-        m_offset += length.value();
+        std::string value(reinterpret_cast<char const*>(m_data.data() + m_offset), length);
+        m_offset += length;
         return value;
     }
 
     template<Serializable T>
-    auto read_optional() -> std::expected<std::optional<T>, std::string>
+    auto read_optional() -> Common::Expected<std::optional<T>>
     {
-        auto has_value = read<u8>();
-        if (!has_value.has_value()) {
-            return std::unexpected(std::move(has_value).error());
-        }
+        u8 present {};
+        TRY_ASSIGN(present, read<u8>());
 
-        if (has_value.value() == 0) {
+        if (present == 0) {
             return std::optional<T> {};
         }
 
-        auto value = read<T>();
-        if (!value.has_value()) {
-            return std::unexpected(std::move(value).error());
-        }
-        return std::optional<T>(std::move(value).value());
+        T value {};
+        TRY_ASSIGN(value, read<T>());
+        return std::optional<T>(std::move(value));
     }
 
     auto remaining() const -> u64

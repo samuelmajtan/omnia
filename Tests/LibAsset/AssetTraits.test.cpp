@@ -8,6 +8,7 @@
 
 #include <gtest/gtest.h>
 
+#include <Common/Expected.h>
 #include <LibAsset/AssetFile.h>
 #include <LibAsset/AssetTraits.h>
 
@@ -52,7 +53,7 @@ auto make_model() -> Asset::ModelData
 }
 
 template<typename T>
-auto round_trip(T const& value) -> std::expected<T, std::string>
+auto round_trip(T const& value) -> Common::Expected<T>
 {
     Binary::ByteWriter writer;
     Asset::AssetTraits<T>::write(writer, value);

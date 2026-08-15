@@ -12,6 +12,7 @@
 #include <variant>
 #include <vector>
 
+#include <Common/Expected.h>
 #include <Common/Noncopyable.h>
 #include <Common/Types.h>
 #include <LibAsset/Asset.h>
@@ -51,11 +52,11 @@ class ASSET_API AssetRegistry final {
 public:
     explicit AssetRegistry(std::filesystem::path const& root_directory);
 
-    auto scan() -> std::expected<void, std::string>;
+    auto scan() -> Common::Expected<void>;
 
-    auto register_asset(AssetEntry const& entry) -> std::expected<void, std::string>;
+    auto register_asset(AssetEntry const& entry) -> Common::Expected<void>;
     auto key_to_id(std::string const& key) const -> std::optional<AssetID>;
-    auto resolve(AssetID id) const -> std::expected<AssetEntry, std::string>;
+    auto resolve(AssetID id) const -> Common::Expected<AssetEntry>;
     auto resolve_key(std::filesystem::path path) const -> std::string;
 
     auto entries() const -> std::unordered_map<std::string, AssetEntry> const&;

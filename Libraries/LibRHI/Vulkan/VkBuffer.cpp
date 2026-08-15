@@ -7,12 +7,13 @@
 #include <cassert>
 #include <format>
 
+#include <Common/Expected.h>
 #include <LibRHI/Vulkan/VkBuffer.h>
 #include <LibRHI/Vulkan/VkStagingBuffer.h>
 
 namespace RHI {
 
-auto VkBuffer::create(Configuration const& config, RHI::VkDevice const* device) -> std::expected<std::unique_ptr<VkBuffer>, std::string>
+auto VkBuffer::create(Configuration const& config, RHI::VkDevice const* device) -> Common::Expected<std::unique_ptr<VkBuffer>>
 {
     std::unique_ptr<VkBuffer> buffer(new VkBuffer(config, device));
 
@@ -51,7 +52,7 @@ auto VkBuffer::handle() const -> ::VkBuffer
     return m_handle;
 }
 
-auto VkBuffer::create_buffer() -> std::expected<void, std::string>
+auto VkBuffer::create_buffer() -> Common::Expected<void>
 {
     VkBufferCreateInfo buffer_create_info {
         .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
@@ -85,12 +86,12 @@ auto VkBuffer::create_buffer() -> std::expected<void, std::string>
     }
 
     if (auto result = vmaCreateBuffer(m_device->allocator(), &buffer_create_info, &allocation_create_info, &m_handle, &m_allocation, &m_allocation_info); result != VK_SUCCESS) {
-        return std::unexpected(std::format("Failed to create Vulkan buffer: {}", string_VkResult(result)));
+        return OA_ERROR("Failed to create Vulkan buffer: {}", string_VkResult(result));
     }
     return {};
 }
 
-auto VkBuffer::upload_data() -> std::expected<void, std::string>
+auto VkBuffer::upload_data() -> Common::Expected<void>
 {
     if (m_config.data == nullptr || m_config.size == 0) {
         return {};
@@ -101,11 +102,9 @@ auto VkBuffer::upload_data() -> std::expected<void, std::string>
         return {};
     }
 
-    auto staging_buffer = VkStagingBuffer::create(m_device, m_config.size);
-    if (!staging_buffer.has_value()) {
-        return std::unexpected(staging_buffer.error());
-    }
-    std::memcpy(staging_buffer->allocation_info().pMappedData, m_config.data, static_cast<std::size_t>(m_config.size));
+    VkStagingBuffer staging_buffer;
+    TRY_ASSIGN(staging_buffer, VkStagingBuffer::create(m_device, m_config.size));
+    std::memcpy(staging_buffer.allocation_info().pMappedData, m_config.data, static_cast<std::size_t>(m_config.size));
 
     VkBufferCopy const copy_region {
         .srcOffset = 0,
@@ -115,7 +114,7 @@ auto VkBuffer::upload_data() -> std::expected<void, std::string>
 
     auto& cmd = m_device->graphics_command_buffer();
     cmd.begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-    vkCmdCopyBuffer(cmd.handle(), staging_buffer->handle(), m_handle, 1, &copy_region);
+    vkCmdCopyBuffer(cmd.handle(), staging_buffer.handle(), m_handle, 1, &copy_region);
     m_device->submit_graphics(cmd);
 
     return {};

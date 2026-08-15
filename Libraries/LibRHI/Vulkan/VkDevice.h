@@ -9,22 +9,23 @@
 #include <unordered_map>
 #include <vk_mem_alloc.h>
 
+#include <Common/Expected.h>
 #include <Common/Noncopyable.h>
 #include <LibRHI/Device.h>
+#include <LibRHI/Vulkan/VkCommandBuffer.h>
 #include <LibRHI/Vulkan/VkCommon.h>
 #include <LibRHI/Vulkan/VkPhysicalDevice.h>
-#include <LibRHI/Vulkan/VkCommandBuffer.h>
 
 namespace RHI {
 
 class VkDevice final : public Device {
 public:
-    static auto create(Configuration const& config) -> std::expected<std::unique_ptr<VkDevice>, std::string>;
+    static auto create(Configuration const& config) -> Common::Expected<std::unique_ptr<VkDevice>>;
 
     ~VkDevice() override;
 
     auto descriptor_pool() const -> VkDescriptorPool;
-    auto grow_descriptor_pool() -> std::expected<VkDescriptorPool, std::string>;
+    auto grow_descriptor_pool() -> Common::Expected<VkDescriptorPool>;
     auto allocator() const -> VmaAllocator;
     auto handle() const -> ::VkDevice;
     auto surface() const -> VkSurfaceKHR;
@@ -43,25 +44,25 @@ public:
     auto physical_devices() const -> std::vector<std::string_view> override;
     auto select_physical_device(std::string_view name) -> bool override;
 
-    auto create_buffer(Buffer::Configuration const& config) const -> std::expected<std::unique_ptr<Buffer>, std::string> override;
-    auto create_pipeline(Pipeline::Configuration const& config) const -> std::expected<std::unique_ptr<Pipeline>, std::string> override;
-    auto create_render_pass(RenderPass::Configuration const& config) const -> std::expected<std::unique_ptr<RenderPass>, std::string> override;
-    auto create_render_target(RenderTarget::Configuration const& config) const -> std::expected<std::unique_ptr<RenderTarget>, std::string> override;
-    auto create_resource_layout(ResourceLayout::Configuration const& config) const -> std::expected<std::unique_ptr<ResourceLayout>, std::string> override;
-    auto create_resource_set(ResourceSet::Configuration const& config) -> std::expected<std::unique_ptr<ResourceSet>, std::string> override;
-    auto create_sampler(Sampler::Configuration const& config) const -> std::expected<std::unique_ptr<Sampler>, std::string> override;
-    auto create_shader(Shader::Configuration const& config) const -> std::expected<std::unique_ptr<Shader>, std::string> override;
-    auto create_swapchain(Swapchain::Configuration const& config) const -> std::expected<std::unique_ptr<Swapchain>, std::string> override;
-    auto create_texture(Texture::Configuration const& config) const -> std::expected<std::unique_ptr<Texture>, std::string> override;
+    auto create_buffer(Buffer::Configuration const& config) const -> Common::Expected<std::unique_ptr<Buffer>> override;
+    auto create_pipeline(Pipeline::Configuration const& config) const -> Common::Expected<std::unique_ptr<Pipeline>> override;
+    auto create_render_pass(RenderPass::Configuration const& config) const -> Common::Expected<std::unique_ptr<RenderPass>> override;
+    auto create_render_target(RenderTarget::Configuration const& config) const -> Common::Expected<std::unique_ptr<RenderTarget>> override;
+    auto create_resource_layout(ResourceLayout::Configuration const& config) const -> Common::Expected<std::unique_ptr<ResourceLayout>> override;
+    auto create_resource_set(ResourceSet::Configuration const& config) -> Common::Expected<std::unique_ptr<ResourceSet>> override;
+    auto create_sampler(Sampler::Configuration const& config) const -> Common::Expected<std::unique_ptr<Sampler>> override;
+    auto create_shader(Shader::Configuration const& config) const -> Common::Expected<std::unique_ptr<Shader>> override;
+    auto create_swapchain(Swapchain::Configuration const& config) const -> Common::Expected<std::unique_ptr<Swapchain>> override;
+    auto create_texture(Texture::Configuration const& config) const -> Common::Expected<std::unique_ptr<Texture>> override;
 private:
     VkDevice(Configuration const& config);
 
-    auto create_instance() -> std::expected<void, std::string>;
-    auto create_surface() -> std::expected<void, std::string>;
-    auto create_logical_device() -> std::expected<void, std::string>;
-    auto create_allocator() -> std::expected<void, std::string>;
-    auto create_command_pools() -> std::expected<void, std::string>;
-    auto create_descriptor_pool() -> std::expected<void, std::string>;
+    auto create_instance() -> Common::Expected<void>;
+    auto create_surface() -> Common::Expected<void>;
+    auto create_logical_device() -> Common::Expected<void>;
+    auto create_allocator() -> Common::Expected<void>;
+    auto create_command_pools() -> Common::Expected<void>;
+    auto create_descriptor_pool() -> Common::Expected<void>;
 private:
     Configuration m_config {};
     VmaAllocator m_allocator {};

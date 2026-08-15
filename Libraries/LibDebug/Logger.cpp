@@ -9,6 +9,7 @@
 #include <fstream>
 #include <mutex>
 
+#include <Common/Expected.h>
 #include <Common/File.h>
 #include <Common/Time.h>
 #include <LibDebug/Logger.h>
@@ -50,12 +51,12 @@ void close_files(LoggerState& state)
 
 }
 
-auto Logger::initialize() -> std::expected<void, std::string>
+auto Logger::initialize() -> Common::Expected<void>
 {
     return initialize(Configuration {});
 }
 
-auto Logger::initialize(Configuration const& config) -> std::expected<void, std::string>
+auto Logger::initialize(Configuration const& config) -> Common::Expected<void>
 {
     auto& state = logger_state();
     std::lock_guard const lock(state.mutex);
@@ -73,13 +74,11 @@ auto Logger::initialize(Configuration const& config) -> std::expected<void, std:
         ? config.file_path.value()
         : config.directory / std::format("Omnia_{}.log", Time::format_filename(Time::now()));
 
-    if (auto result = File::create_parent_dir(path); !result.has_value()) {
-        return result;
-    }
+    TRY(File::create_parent_dir(path));
 
     state.file.open(path, std::ios::trunc);
     if (!state.file.is_open()) {
-        return std::unexpected(std::format("Failed to open log file: {}", path.string()));
+        return OA_ERROR("Failed to open log file: {}", path.string());
     }
 
     if (config.write_latest) {
@@ -130,17 +129,10 @@ auto Logger::file_path() -> std::filesystem::path
     return state.path;
 }
 
-void Logger::dispatch(LogLevel level, std::string_view component, std::string_view message, std::source_location const& location)
+void Logger::dispatch(LogLevel level, std::string_view component, std::string_view message)
 {
     auto const timestamp = Time::format_log(Time::now());
-
-    std::string origin;
-    if (level >= LogLevel::Error) {
-        auto location_path = std::filesystem::path(location.file_name());
-        origin = std::format(" ({}:{})", location_path.filename().string(), location.line());
-    }
-
-    auto const line = std::format("[{}] [{} - {}]: {}{}\n", timestamp, component, to_string(level), message, origin);
+    auto const line = std::format("[{}] [{} - {}]: {}\n", timestamp, component, to_string(level), message);
 
     auto const to_standard_error = level >= LogLevel::Warn;
     auto* stream = to_standard_error ? stderr : stdout;

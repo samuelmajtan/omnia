@@ -10,6 +10,7 @@
 #include <memory>
 #include <string>
 
+#include <Common/Expected.h>
 #include <Common/Noncopyable.h>
 #include <LibRHI/ResourceSet.h>
 #include <LibRHI/Vulkan/VkDevice.h>
@@ -18,7 +19,7 @@ namespace RHI {
 
 class VkResourceSet : public ResourceSet {
 public:
-    static auto create(Configuration const& config, RHI::VkDevice* device) -> std::expected<std::unique_ptr<VkResourceSet>, std::string>;
+    static auto create(Configuration const& config, RHI::VkDevice* device) -> Common::Expected<std::unique_ptr<VkResourceSet>>;
 
     ~VkResourceSet() override;
 

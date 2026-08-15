@@ -4,11 +4,12 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+#include <Common/Expected.h>
 #include <LibRHI/Metal/MTLShader.h>
 
 namespace RHI {
 
-auto MTLShader::create(Configuration const& config) -> std::expected<std::unique_ptr<MTLShader>, std::string>
+auto MTLShader::create(Configuration const& config) -> Common::Expected<std::unique_ptr<MTLShader>>
 {
     std::unique_ptr<MTLShader> shader(new MTLShader);
     shader->m_config = config;

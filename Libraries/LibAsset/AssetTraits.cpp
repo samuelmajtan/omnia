@@ -16,12 +16,12 @@ auto AssetTraits<ShaderData>::extensions() -> std::vector<std::string>
     return Importer::supported_extensions();
 }
 
-auto AssetTraits<ShaderData>::import(ImportContext const& context) -> std::expected<ShaderData, std::string>
+auto AssetTraits<ShaderData>::import(ImportContext const& context) -> Common::Expected<ShaderData>
 {
     return Importer::import(context);
 }
 
-auto AssetTraits<ShaderData>::source_hash(ImportContext const& context) -> std::expected<u64, std::string>
+auto AssetTraits<ShaderData>::source_hash(ImportContext const& context) -> Common::Expected<u64>
 {
     return Importer::source_hash(context);
 }
@@ -31,12 +31,12 @@ auto AssetTraits<TextureData>::extensions() -> std::vector<std::string>
     return Importer::supported_extensions();
 }
 
-auto AssetTraits<TextureData>::import(ImportContext const& context) -> std::expected<TextureData, std::string>
+auto AssetTraits<TextureData>::import(ImportContext const& context) -> Common::Expected<TextureData>
 {
     return Importer::import(context);
 }
 
-auto AssetTraits<TextureData>::source_hash(ImportContext const& context) -> std::expected<u64, std::string>
+auto AssetTraits<TextureData>::source_hash(ImportContext const& context) -> Common::Expected<u64>
 {
     return Importer::source_hash(context);
 }
@@ -46,12 +46,12 @@ auto AssetTraits<ModelData>::extensions() -> std::vector<std::string>
     return Importer::supported_extensions();
 }
 
-auto AssetTraits<ModelData>::import(ImportContext const& context) -> std::expected<ModelData, std::string>
+auto AssetTraits<ModelData>::import(ImportContext const& context) -> Common::Expected<ModelData>
 {
     return Importer::import(context);
 }
 
-auto AssetTraits<ModelData>::source_hash(ImportContext const& context) -> std::expected<u64, std::string>
+auto AssetTraits<ModelData>::source_hash(ImportContext const& context) -> Common::Expected<u64>
 {
     return Importer::source_hash(context);
 }
@@ -73,7 +73,7 @@ void AssetTraits<ShaderData>::write(Binary::ByteWriter& writer, ShaderData const
     }
 }
 
-auto AssetTraits<ShaderData>::read(Binary::ByteReader& reader) -> std::expected<ShaderData, std::string>
+auto AssetTraits<ShaderData>::read(Binary::ByteReader& reader) -> Common::Expected<ShaderData>
 {
     Graphics::ShaderStage stage {};
     // ShaderStage starts at 1, so 0 is as invalid as anything past Fragment.
@@ -105,7 +105,7 @@ void AssetTraits<TextureData>::write(Binary::ByteWriter& writer, TextureData con
     writer.write_vector(data.data);
 }
 
-auto AssetTraits<TextureData>::read(Binary::ByteReader& reader) -> std::expected<TextureData, std::string>
+auto AssetTraits<TextureData>::read(Binary::ByteReader& reader) -> Common::Expected<TextureData>
 {
     u32 width {};
     TRY_ASSIGN(width, reader.read<u32>());
@@ -122,7 +122,7 @@ auto AssetTraits<TextureData>::read(Binary::ByteReader& reader) -> std::expected
     // Always 4 channels as enforced by the importer
     auto const expected_size = static_cast<u64>(width) * height * 4;
     if (pixels.size() != expected_size) {
-        return std::unexpected(std::format("Texture is {}x{} so it should hold {} bytes, but the payload has {}.", width, height, expected_size, pixels.size()));
+        return OA_ERROR("Texture is {}x{} so it should hold {} bytes, but the payload has {}", width, height, expected_size, pixels.size());
     }
 
     return TextureData {
@@ -156,7 +156,7 @@ void AssetTraits<ModelData>::write(Binary::ByteWriter& writer, ModelData const& 
     }
 }
 
-auto AssetTraits<ModelData>::read(Binary::ByteReader& reader) -> std::expected<ModelData, std::string>
+auto AssetTraits<ModelData>::read(Binary::ByteReader& reader) -> Common::Expected<ModelData>
 {
     u64 sub_mesh_count {};
     TRY_ASSIGN(sub_mesh_count, reader.read<u64>());
@@ -204,7 +204,7 @@ auto AssetTraits<ModelData>::read(Binary::ByteReader& reader) -> std::expected<M
 
     for (auto const& sub_mesh : data.sub_meshes) {
         if (sub_mesh.material_index >= data.materials.size()) {
-            return std::unexpected(std::format("Submesh references material {} but the model only has {}.", sub_mesh.material_index, data.materials.size()));
+            return OA_ERROR("Submesh references material {} but the model only has {}", sub_mesh.material_index, data.materials.size());
         }
     }
 

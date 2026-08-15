@@ -9,9 +9,10 @@
 #include <expected>
 #include <string>
 
+#include <Common/Expected.h>
 #include <LibGraphics/ModelTypes.h>
-#include <LibRenderer/Export.h>
 #include <LibRHI/Device.h>
+#include <LibRenderer/Export.h>
 
 namespace Renderer {
 
@@ -23,7 +24,7 @@ class RENDERER_API SubMesh final {
 public:
     using Configuration = Graphics::SubMeshData;
 
-    static auto create(Configuration const& configuration, RHI::Device const* device) -> std::expected<SubMesh, std::string>;
+    static auto create(Configuration const& configuration, RHI::Device const* device) -> Common::Expected<SubMesh>;
 
     auto vertex_buffer() const -> RHI::Buffer const*;
     auto index_buffer() const -> RHI::Buffer const*;

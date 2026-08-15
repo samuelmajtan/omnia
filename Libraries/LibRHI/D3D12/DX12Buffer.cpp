@@ -4,11 +4,12 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+#include <Common/Expected.h>
 #include <LibRHI/D3D12/DX12Buffer.h>
 
 namespace RHI {
 
-auto DX12Buffer::create(Configuration const& config) -> std::expected<std::unique_ptr<DX12Buffer>, std::string>
+auto DX12Buffer::create(Configuration const& config) -> Common::Expected<std::unique_ptr<DX12Buffer>>
 {
     std::unique_ptr<DX12Buffer> buffer(new DX12Buffer);
     buffer->m_config = config;

@@ -40,21 +40,21 @@ public:
     auto cooked_asset_cache_root() const -> std::filesystem::path const&;
     auto cooked_asset_path(AssetID id) const -> std::filesystem::path;
 
-    auto load_loose_assets() -> std::expected<void, std::string>;
-    auto load_packed_assets() -> std::expected<void, std::string>;
+    auto load_loose_assets() -> Common::Expected<void>;
+    auto load_packed_assets() -> Common::Expected<void>;
 
     template<AssetData T>
-    auto import(std::string const& key) const -> std::expected<T, std::string>
+    auto import(std::string const& key) const -> Common::Expected<T>
     {
         auto id = m_asset_registry.key_to_id(key);
         if (!id) {
-            return std::unexpected(std::format("Asset with key '{}' not found.", key));
+            return OA_ERROR("Asset with key '{}' not found", key);
         }
         return import <T>(id.value());
     }
 
     template<AssetData T>
-    auto import(AssetID id) const -> std::expected<T, std::string>
+    auto import(AssetID id) const -> Common::Expected<T>
     {
         AssetEntry entry;
         TRY_ASSIGN(entry, m_asset_registry.resolve(id));
@@ -72,18 +72,18 @@ private:
     }
 
     template<AssetData T>
-    auto import_entry(AssetEntry const& entry, bool force) const -> std::expected<T, std::string>
+    auto import_entry(AssetEntry const& entry, bool force) const -> Common::Expected<T>
     {
         auto const* source = std::get_if<LooseAssetEntry>(&entry.source);
         if (source == nullptr) {
-            return std::unexpected("Packed assets are not supported yet");
+            return OA_ERROR("Packed assets are not supported yet");
         }
 
         auto const context = context_for(entry, source->path);
 
-        u64 source_hash {};
-        TRY_ASSIGN(source_hash, AssetTraits<T>::source_hash(context));
-        source_hash = entry.sidecar.hash_settings(source_hash);
+        u64 hash {};
+        TRY_ASSIGN(hash, AssetTraits<T>::source_hash(context));
+        auto const source_hash = entry.sidecar.hash_settings(hash);
 
         if (!force) {
             if (auto cached = try_load_cooked_asset<T>(entry, source_hash); cached.has_value()) {
@@ -94,9 +94,7 @@ private:
         T value {};
         TRY_ASSIGN(value, AssetTraits<T>::import(context));
 
-        if (auto result = write_cooked_asset<T>(entry, value, source_hash); !result.has_value()) {
-            return std::unexpected(std::move(result).error());
-        }
+        TRY(write_cooked_asset<T>(entry, value, source_hash));
         return value;
     }
 
@@ -126,7 +124,7 @@ private:
     }
 
     template<AssetData T>
-    auto write_cooked_asset(AssetEntry const& entry, T const& value, u64 source_hash) const -> std::expected<void, std::string>
+    auto write_cooked_asset(AssetEntry const& entry, T const& value, u64 source_hash) const -> Common::Expected<void>
     {
         Binary::ByteWriter payload;
         AssetTraits<T>::write(payload, value);
@@ -142,7 +140,10 @@ private:
         header.write(file);
         file.write_bytes(payload.bytes());
 
-        return File::write_binary(cooked_asset_path(entry.id()), file.bytes());
+        if (auto result = File::write_binary(cooked_asset_path(entry.id()), file.bytes()); !result.has_value()) {
+            return OA_ERROR("Failed to write the cooked asset for '{}': {}", entry.key, result.error().message());
+        }
+        return {};
     }
 private:
     AssetRegistry m_asset_registry;

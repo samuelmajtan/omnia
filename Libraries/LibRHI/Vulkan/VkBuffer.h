@@ -10,6 +10,7 @@
 #include <memory>
 #include <string>
 
+#include <Common/Expected.h>
 #include <Common/Noncopyable.h>
 #include <LibRHI/Buffer.h>
 #include <LibRHI/Vulkan/VkDevice.h>
@@ -18,7 +19,7 @@ namespace RHI {
 
 class VkBuffer final : public Buffer {
 public:
-    static auto create(Configuration const& config, RHI::VkDevice const* device) -> std::expected<std::unique_ptr<VkBuffer>, std::string>;
+    static auto create(Configuration const& config, RHI::VkDevice const* device) -> Common::Expected<std::unique_ptr<VkBuffer>>;
 
     ~VkBuffer() override;
 
@@ -27,8 +28,8 @@ public:
 private:
     VkBuffer(Configuration const& config, RHI::VkDevice const* device);
 
-    auto create_buffer() -> std::expected<void, std::string>;
-    auto upload_data() -> std::expected<void, std::string>;
+    auto create_buffer() -> Common::Expected<void>;
+    auto upload_data() -> Common::Expected<void>;
 private:
     Configuration m_config {};
     RHI::VkDevice const* m_device {};

@@ -10,6 +10,7 @@
 #include <memory>
 #include <string>
 
+#include <Common/Expected.h>
 #include <Common/Noncopyable.h>
 #include <LibRHI/Texture.h>
 
@@ -20,7 +21,7 @@ class MTLTexture final : public Texture {
     OA_MAKE_NONMOVABLE(MTLTexture);
 
 public:
-    static auto create(Configuration const& config) -> std::expected<std::unique_ptr<MTLTexture>, std::string>;
+    static auto create(Configuration const& config) -> Common::Expected<std::unique_ptr<MTLTexture>>;
 
     ~MTLTexture() override;
 

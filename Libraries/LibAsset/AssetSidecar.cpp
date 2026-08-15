@@ -32,7 +32,7 @@ auto AssetSidecar::path_for(std::filesystem::path const& source_path) -> std::fi
     return path;
 }
 
-auto AssetSidecar::load(std::filesystem::path const& sidecar_path) -> std::expected<AssetSidecar, std::string>
+auto AssetSidecar::load(std::filesystem::path const& sidecar_path) -> Common::Expected<AssetSidecar>
 {
     std::vector<std::string> lines;
     TRY_ASSIGN(lines, File::read_lines(sidecar_path));
@@ -49,7 +49,7 @@ auto AssetSidecar::load(std::filesystem::path const& sidecar_path) -> std::expec
 
         auto const separator = content.find('=');
         if (separator == std::string_view::npos) {
-            return std::unexpected(std::format("{}:{}: expected 'key = value', got '{}'.", sidecar_path.string(), number + 1, content));
+            return OA_ERROR("{}:{}: expected 'key = value', got '{}'", sidecar_path.string(), number + 1, content);
         }
 
         auto const key = std::string(String::trimmed(content.substr(0, separator)));
@@ -58,12 +58,12 @@ auto AssetSidecar::load(std::filesystem::path const& sidecar_path) -> std::expec
         if (key == UUID_KEY) {
             id = Common::UUID::from_string(value);
             if (!id) {
-                return std::unexpected(std::format("{}:{}: '{}' is not a valid UUID.", sidecar_path.string(), number + 1, value));
+                return OA_ERROR("{}:{}: '{}' is not a valid UUID", sidecar_path.string(), number + 1, value);
             }
         } else if (key == TYPE_KEY) {
             type = asset_type_from_string(value);
             if (!type) {
-                return std::unexpected(std::format("{}:{}: '{}' is not a known asset type.", sidecar_path.string(), number + 1, value));
+                return OA_ERROR("{}:{}: '{}' is not a known asset type", sidecar_path.string(), number + 1, value);
             }
         } else {
             sidecar.m_settings.emplace(key, std::move(value));
@@ -71,10 +71,10 @@ auto AssetSidecar::load(std::filesystem::path const& sidecar_path) -> std::expec
     }
 
     if (!id) {
-        return std::unexpected(std::format("{}: missing required '{}' key.", sidecar_path.string(), UUID_KEY));
+        return OA_ERROR("{}: missing required '{}' key", sidecar_path.string(), UUID_KEY);
     }
     if (!type) {
-        return std::unexpected(std::format("{}: missing required '{}' key.", sidecar_path.string(), TYPE_KEY));
+        return OA_ERROR("{}: missing required '{}' key", sidecar_path.string(), TYPE_KEY);
     }
 
     sidecar.m_id = id.value();
@@ -82,7 +82,7 @@ auto AssetSidecar::load(std::filesystem::path const& sidecar_path) -> std::expec
     return sidecar;
 }
 
-auto AssetSidecar::save(std::filesystem::path const& sidecar_path) const -> std::expected<void, std::string>
+auto AssetSidecar::save(std::filesystem::path const& sidecar_path) const -> Common::Expected<void>
 {
     std::string content;
     content += SIDECAR_HEADER;

@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <Common/Expected.h>
 #include <LibAsset/AssetRegistry.h>
 #include <LibAsset/Export.h>
 #include <LibAsset/Importer.h>
@@ -34,11 +35,11 @@ public:
     static constexpr u32 VERSION = 2;
 
 public:
-    static auto import(ImportContext const& context) -> std::expected<ModelData, std::string>;
-    static auto source_hash(ImportContext const& context) -> std::expected<u64, std::string>;
+    static auto import(ImportContext const& context) -> Common::Expected<ModelData>;
+    static auto source_hash(ImportContext const& context) -> Common::Expected<u64>;
     static auto supported_extensions() -> std::vector<std::string>;
 private:
-    static auto import_gltf(ImportContext const& context) -> std::expected<ModelData, std::string>;
+    static auto import_gltf(ImportContext const& context) -> Common::Expected<ModelData>;
 };
 
 }

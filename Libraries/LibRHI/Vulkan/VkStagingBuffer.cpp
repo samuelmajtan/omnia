@@ -6,11 +6,12 @@
 
 #include <format>
 
+#include <Common/Expected.h>
 #include <LibRHI/Vulkan/VkStagingBuffer.h>
 
 namespace RHI {
 
-auto VkStagingBuffer::create(const RHI::VkDevice* device, u64 size) -> std::expected<VkStagingBuffer, std::string>
+auto VkStagingBuffer::create(const RHI::VkDevice* device, u64 size) -> Common::Expected<VkStagingBuffer>
 {
     VkStagingBuffer staging_buffer {};
     staging_buffer.m_device = device;
@@ -38,7 +39,7 @@ auto VkStagingBuffer::create(const RHI::VkDevice* device, u64 size) -> std::expe
     };
 
     if (auto result = vmaCreateBuffer(staging_buffer.m_device->allocator(), &buffer_create_info, &allocation_create_info, &staging_buffer.m_handle, &staging_buffer.m_allocation, &staging_buffer.m_allocation_info); result != VK_SUCCESS) {
-        return std::unexpected(std::format("Failed to create Vulkan staging buffer: {}", string_VkResult(result)));
+        return OA_ERROR("Failed to create Vulkan staging buffer: {}", string_VkResult(result));
     }
 
     return staging_buffer;

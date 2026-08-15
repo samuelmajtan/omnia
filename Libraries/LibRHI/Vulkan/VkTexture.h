@@ -10,6 +10,7 @@
 #include <memory>
 #include <string>
 
+#include <Common/Expected.h>
 #include <Common/Noncopyable.h>
 #include <LibRHI/Texture.h>
 #include <LibRHI/Vulkan/VkDevice.h>
@@ -18,8 +19,8 @@ namespace RHI {
 
 class VkTexture final : public Texture {
 public:
-    static auto create_owned(Configuration const& config, RHI::VkDevice const* device) -> std::expected<std::unique_ptr<VkTexture>, std::string>;
-    static auto create_borrowed(Configuration const& config, RHI::VkDevice const* device, VkImage image, VkImageView image_view) -> std::expected<std::unique_ptr<VkTexture>, std::string>;
+    static auto create_owned(Configuration const& config, RHI::VkDevice const* device) -> Common::Expected<std::unique_ptr<VkTexture>>;
+    static auto create_borrowed(Configuration const& config, RHI::VkDevice const* device, VkImage image, VkImageView image_view) -> Common::Expected<std::unique_ptr<VkTexture>>;
 
     ~VkTexture() override;
 

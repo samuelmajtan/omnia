@@ -105,7 +105,7 @@ TEST_F(LoggerTest, RecordsEveryLevelInOrder)
     EXPECT_NE(lines[5].find("- FATAL]: f"), std::string::npos);
 }
 
-TEST_F(LoggerTest, AppendsCallSiteToErrorAndFatalOnly)
+TEST_F(LoggerTest, DoesNotAppendItsOwnCallSite)
 {
     ASSERT_TRUE(Debug::Logger::initialize(configuration()).has_value());
 
@@ -118,10 +118,24 @@ TEST_F(LoggerTest, AppendsCallSiteToErrorAndFatalOnly)
     auto const lines = logged_lines();
     ASSERT_EQ(lines.size(), 4u);
 
-    EXPECT_EQ(lines[0].find("Logger.test.cpp:"), std::string::npos);
-    EXPECT_EQ(lines[1].find("Logger.test.cpp:"), std::string::npos);
-    EXPECT_NE(lines[2].find("Logger.test.cpp:"), std::string::npos);
-    EXPECT_NE(lines[3].find("Logger.test.cpp:"), std::string::npos);
+    for (auto const& line : lines) {
+        EXPECT_EQ(line.find("Logger.test.cpp:"), std::string::npos);
+    }
+}
+
+TEST_F(LoggerTest, KeepsAnErrorsOwnOrigin)
+{
+    ASSERT_TRUE(Debug::Logger::initialize(configuration()).has_value());
+
+    auto const failure = []() -> Common::Expected<void> { return OA_ERROR("The disk is on fire"); }();
+    ASSERT_FALSE(failure.has_value());
+
+    Logger.error("{}", failure.error());
+    Debug::Logger::shutdown();
+
+    auto const lines = logged_lines();
+    ASSERT_EQ(lines.size(), 1u);
+    EXPECT_NE(lines[0].find("The disk is on fire (Logger.test.cpp:"), std::string::npos);
 }
 
 TEST_F(LoggerTest, DropsLinesBelowTheFileLevel)

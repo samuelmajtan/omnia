@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <Common/Expected.h>
 #include <LibGraphics/ModelTypes.h>
 #include <LibRHI/Device.h>
 #include <LibRenderer/Export.h>
@@ -29,7 +30,7 @@ public:
         Graphics::MaterialParameters parameters {};
     };
 
-    static auto create(Configuration const& configuration, RHI::Device* device) -> std::expected<Material, std::string>;
+    static auto create(Configuration const& configuration, RHI::Device* device) -> Common::Expected<Material>;
 
     auto resource_set() const -> RHI::ResourceSet const*;
 private:

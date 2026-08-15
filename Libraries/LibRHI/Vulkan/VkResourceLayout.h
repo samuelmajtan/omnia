@@ -10,6 +10,7 @@
 #include <memory>
 #include <string>
 
+#include <Common/Expected.h>
 #include <LibRHI/ResourceLayout.h>
 #include <LibRHI/Vulkan/VkDevice.h>
 
@@ -17,7 +18,7 @@ namespace RHI {
 
 class VkResourceLayout final : public ResourceLayout {
 public:
-    static auto create(Configuration const& config, RHI::VkDevice const* device) -> std::expected<std::unique_ptr<VkResourceLayout>, std::string>;
+    static auto create(Configuration const& config, RHI::VkDevice const* device) -> Common::Expected<std::unique_ptr<VkResourceLayout>>;
 
     ~VkResourceLayout() override;
 

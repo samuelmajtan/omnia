@@ -10,6 +10,7 @@
 #include <memory>
 #include <string>
 
+#include <Common/Expected.h>
 #include <LibRHI/Sampler.h>
 #include <LibRHI/Vulkan/VkDevice.h>
 
@@ -17,7 +18,7 @@ namespace RHI {
 
 class VkSampler final : public Sampler {
 public:
-    static auto create(Configuration const& config, RHI::VkDevice const* device) -> std::expected<std::unique_ptr<VkSampler>, std::string>;
+    static auto create(Configuration const& config, RHI::VkDevice const* device) -> Common::Expected<std::unique_ptr<VkSampler>>;
 
     ~VkSampler() override;
 

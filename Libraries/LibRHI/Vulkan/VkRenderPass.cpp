@@ -7,21 +7,18 @@
 #include <cassert>
 #include <format>
 
+#include <Common/Expected.h>
 #include <LibRHI/Vulkan/VkRenderPass.h>
 #include <LibRHI/Vulkan/VkRenderTarget.h>
 #include <LibRHI/Vulkan/VkSwapchain.h>
 
 namespace RHI {
 
-auto VkRenderPass::create(const RHI::RenderPass::Configuration& config, RHI::VkDevice const* device) -> std::expected<std::unique_ptr<RHI::VkRenderPass>, std::string>
+auto VkRenderPass::create(const RHI::RenderPass::Configuration& config, RHI::VkDevice const* device) -> Common::Expected<std::unique_ptr<RHI::VkRenderPass>>
 {
     std::unique_ptr<VkRenderPass> render_pass(new VkRenderPass(config, device));
 
-    auto result = render_pass->create_render_pass();
-    if (!result.has_value()) {
-        return std::unexpected(result.error());
-    }
-
+    TRY(render_pass->create_render_pass());
     return render_pass;
 }
 
@@ -71,7 +68,7 @@ void VkRenderPass::end(CommandBuffer const* command_buffer) const
     vkCmdEndRenderPass(vk_cmd->handle());
 }
 
-auto VkRenderPass::create_render_pass() -> std::expected<void, std::string>
+auto VkRenderPass::create_render_pass() -> Common::Expected<void>
 {
     std::vector<VkAttachmentDescription> attachment_descriptions;
     std::vector<VkAttachmentReference> color_attachment_references;
@@ -172,7 +169,7 @@ auto VkRenderPass::create_render_pass() -> std::expected<void, std::string>
     };
 
     if (auto result = vkCreateRenderPass(m_device->handle(), &render_pass_create_info, nullptr, &m_handle); result != VK_SUCCESS) {
-        return std::unexpected(std::format("Failed to create Vulkan render pass: {}", string_VkResult(result)));
+        return OA_ERROR("Failed to create Vulkan render pass: {}", string_VkResult(result));
     }
     return {};
 }

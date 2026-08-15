@@ -25,7 +25,7 @@ AssetRegistry::AssetRegistry(std::filesystem::path const& root_directory)
 {
 }
 
-auto AssetRegistry::scan() -> std::expected<void, std::string>
+auto AssetRegistry::scan() -> Common::Expected<void>
 {
     if (m_root_directory.empty()) {
         return {};
@@ -34,7 +34,7 @@ auto AssetRegistry::scan() -> std::expected<void, std::string>
     std::error_code error;
     auto iterator = std::filesystem::recursive_directory_iterator(m_root_directory, error);
     if (error) {
-        return std::unexpected(std::format("Failed to scan {}: {}", m_root_directory.string(), error.message()));
+        return OA_ERROR("Failed to scan {}: {}", m_root_directory.string(), error.message());
     }
 
     for (auto const& entry : iterator) {
@@ -54,9 +54,7 @@ auto AssetRegistry::scan() -> std::expected<void, std::string>
             TRY_ASSIGN(sidecar, AssetSidecar::load(sidecar_path));
         } else {
             sidecar = AssetSidecar(Common::UUID::generate(), type.value());
-            if (auto result = sidecar.save(sidecar_path); !result.has_value()) {
-                return std::unexpected(std::move(result).error());
-            }
+            TRY(sidecar.save(sidecar_path));
         }
 
         AssetEntry const asset_entry {
@@ -73,10 +71,10 @@ auto AssetRegistry::scan() -> std::expected<void, std::string>
     return {};
 }
 
-auto AssetRegistry::register_asset(AssetEntry const& entry) -> std::expected<void, std::string>
+auto AssetRegistry::register_asset(AssetEntry const& entry) -> Common::Expected<void>
 {
     if (auto const existing = m_assets_by_key.find(entry.key); existing != m_assets_by_key.end()) {
-        return std::unexpected(std::format("Duplicate asset key '{}' -- keeping the first, ignoring the second. Keys drop the file extension, so two files in one directory whose names differ only by extension will collide.", entry.key));
+        return OA_ERROR("Duplicate asset key '{}' -- keeping the first, ignoring the second. Keys drop the file extension, so two files in one directory whose names differ only by extension will collide", entry.key);
     }
 
     m_assets_by_key[entry.key] = entry;
@@ -93,16 +91,16 @@ auto AssetRegistry::key_to_id(std::string const& key) const -> std::optional<Ass
     return it->second.id();
 }
 
-auto AssetRegistry::resolve(AssetID id) const -> std::expected<AssetEntry, std::string>
+auto AssetRegistry::resolve(AssetID id) const -> Common::Expected<AssetEntry>
 {
     auto const key_it = m_keys_by_id.find(id);
     if (key_it == m_keys_by_id.end()) {
-        return std::unexpected(std::format("Asset with ID {} not found in asset registry.", id));
+        return OA_ERROR("Asset with ID {} not found in asset registry", id);
     }
 
     auto const asset_it = m_assets_by_key.find(key_it->second);
     if (asset_it == m_assets_by_key.end()) {
-        return std::unexpected(std::format("Asset with ID {} not found in asset registry.", id));
+        return OA_ERROR("Asset with ID {} not found in asset registry", id);
     }
 
     return asset_it->second;

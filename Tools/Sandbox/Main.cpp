@@ -28,13 +28,11 @@ constexpr Debug::Logger Logger { "Sandbox" };
 
 class Sandbox final {
 public:
-    static auto create() -> std::expected<std::unique_ptr<Sandbox>, std::string>
+    static auto create() -> Common::Expected<std::unique_ptr<Sandbox>>
     {
         std::unique_ptr<Sandbox> sandbox(new Sandbox);
 
-        if (auto result = sandbox->m_asset_manager.load_loose_assets(); !result.has_value()) {
-            return std::unexpected(std::move(result).error());
-        }
+        TRY(sandbox->m_asset_manager.load_loose_assets());
 
         Platform::Window::Configuration const window_config {
             .title = "Omnia Sandbox",
@@ -80,9 +78,7 @@ public:
 
         TRY_ASSIGN(sandbox->m_sponza, sandbox->m_resource_manager->load_model("Models/sponza/Sponza"));
 
-        if (auto result = sandbox->create_swapchain_render_targets(); !result.has_value()) {
-            return std::unexpected(std::move(result).error());
-        }
+        TRY(sandbox->create_swapchain_render_targets());
 
         sandbox->m_window->event_dispatcher().register_listener<Platform::MouseDeltaEvent>(std::bind_front(&Sandbox::on_mouse_delta, sandbox.get()));
         sandbox->m_window->event_dispatcher().register_listener<Platform::WindowResizeEvent>(std::bind_front(&Sandbox::on_resize, sandbox.get()));
@@ -102,7 +98,7 @@ public:
         return true;
     }
 
-    auto create_swapchain_render_targets() -> std::expected<void, std::string>
+    auto create_swapchain_render_targets() -> Common::Expected<void>
     {
         m_swapchain_render_targets.clear();
 

@@ -8,17 +8,18 @@
 #include <vector>
 #include <windowsx.h>
 
+#include <Common/Expected.h>
 #include <LibPlatform/Event.h>
 #include <LibPlatform/Win32/WindowWin32.h>
 
 namespace Platform {
 
-auto Window::create(Configuration const& config) -> std::expected<std::unique_ptr<Window>, std::string>
+auto Window::create(Configuration const& config) -> Common::Expected<std::unique_ptr<Window>>
 {
     return WindowWin32::create(config);
 }
 
-auto WindowWin32::create(Configuration const& config) -> std::expected<std::unique_ptr<WindowWin32>, std::string>
+auto WindowWin32::create(Configuration const& config) -> Common::Expected<std::unique_ptr<WindowWin32>>
 {
     std::unique_ptr<WindowWin32> window(new WindowWin32);
 
@@ -41,7 +42,7 @@ auto WindowWin32::create(Configuration const& config) -> std::expected<std::uniq
         .hIconSm = nullptr
     };
     if (!RegisterClassEx(&window_class)) {
-        return std::unexpected("Failed to register window class.");
+        return OA_ERROR("Failed to register window class");
     }
 
     DWORD constexpr style = WS_CAPTION | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SIZEBOX | WS_SYSMENU;
@@ -57,7 +58,7 @@ auto WindowWin32::create(Configuration const& config) -> std::expected<std::uniq
         rect.right - rect.left, rect.bottom - rect.top,
         nullptr, nullptr, window->m_instance, window.get());
     if (window->m_handle == nullptr) {
-        return std::unexpected("Failed to create window.");
+        return OA_ERROR("Failed to create window");
     }
     ShowWindow(window->m_handle, SW_SHOW);
 
@@ -68,7 +69,7 @@ auto WindowWin32::create(Configuration const& config) -> std::expected<std::uniq
         .hwndTarget = nullptr
     };
     if (RegisterRawInputDevices(&raw_input_device, 1, sizeof(raw_input_device)) == FALSE) {
-        return std::unexpected("Failed to register raw input device.");
+        return OA_ERROR("Failed to register raw input device");
     }
 
     return window;

@@ -7,13 +7,14 @@
 #include <cassert>
 #include <format>
 
+#include <Common/Expected.h>
 #include <LibRHI/Vulkan/VkRenderPass.h>
 #include <LibRHI/Vulkan/VkRenderTarget.h>
 #include <LibRHI/Vulkan/VkTexture.h>
 
 namespace RHI {
 
-auto VkRenderTarget::create(Configuration const& config, RHI::VkDevice const* device) -> std::expected<std::unique_ptr<VkRenderTarget>, std::string>
+auto VkRenderTarget::create(Configuration const& config, RHI::VkDevice const* device) -> Common::Expected<std::unique_ptr<VkRenderTarget>>
 {
     std::unique_ptr<VkRenderTarget> render_target(new VkRenderTarget(config, device));
 
@@ -46,7 +47,7 @@ auto VkRenderTarget::create(Configuration const& config, RHI::VkDevice const* de
     };
 
     if (auto result = vkCreateFramebuffer(device->handle(), &framebuffer_create_info, nullptr, &render_target->m_framebuffer); result != VK_SUCCESS) {
-        return std::unexpected(std::format("Failed to create framebuffer: {}", string_VkResult(result)));
+        return OA_ERROR("Failed to create framebuffer: {}", string_VkResult(result));
     }
 
     return render_target;

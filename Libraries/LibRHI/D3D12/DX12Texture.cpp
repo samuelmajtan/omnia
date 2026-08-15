@@ -4,11 +4,12 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+#include <Common/Expected.h>
 #include <LibRHI/D3D12/DX12Texture.h>
 
 namespace RHI {
 
-auto DX12Texture::create(Configuration const& config) -> std::expected<std::unique_ptr<DX12Texture>, std::string>
+auto DX12Texture::create(Configuration const& config) -> Common::Expected<std::unique_ptr<DX12Texture>>
 {
     std::unique_ptr<DX12Texture> texture(new DX12Texture);
     (void)config;

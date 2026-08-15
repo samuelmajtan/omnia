@@ -10,6 +10,7 @@
 #include <string>
 
 #include <Common/ByteStream.h>
+#include <Common/Expected.h>
 #include <Common/Types.h>
 #include <LibAsset/Asset.h>
 #include <LibAsset/Export.h>
@@ -32,10 +33,8 @@ struct ASSET_API AssetFileHeader {
     u64 payload_size {};
 
     void write(Binary::ByteWriter& writer) const;
-    static auto read(Binary::ByteReader& reader) -> std::expected<AssetFileHeader, std::string>;
+    static auto read(Binary::ByteReader& reader) -> Common::Expected<AssetFileHeader>;
 
-    // True when a cooked asset produced by this header can be trusted for a
-    // source with the given hash, cooked by the given importer revision.
     auto matches(AssetType type, u32 expected_importer_version, u64 expected_source_hash) const -> bool;
 };
 

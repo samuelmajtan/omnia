@@ -10,6 +10,7 @@
 #include <memory>
 #include <string>
 
+#include <Common/Expected.h>
 #include <Common/Noncopyable.h>
 #include <Common/Types.h>
 #include <LibPlatform/Event.h>
@@ -45,7 +46,7 @@ public:
     auto PLATFORM_API instance() const -> HINSTANCE;
     auto PLATFORM_API handle() const -> HWND;
 
-    static auto create(Configuration const& config) -> std::expected<std::unique_ptr<WindowWin32>, std::string>;
+    static auto create(Configuration const& config) -> Common::Expected<std::unique_ptr<WindowWin32>>;
 private:
     WindowWin32() = default;
 

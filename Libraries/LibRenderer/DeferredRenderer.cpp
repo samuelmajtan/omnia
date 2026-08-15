@@ -5,12 +5,11 @@
  */
 
 #include <Common/Expected.h>
-
 #include <LibRenderer/DeferredRenderer.h>
 
 namespace Renderer {
 
-auto DeferredRenderer::create(Configuration const& config) -> std::expected<std::unique_ptr<DeferredRenderer>, std::string>
+auto DeferredRenderer::create(Configuration const& config) -> Common::Expected<std::unique_ptr<DeferredRenderer>>
 {
     std::unique_ptr<DeferredRenderer> renderer(new DeferredRenderer(config));
 
@@ -90,7 +89,7 @@ void DeferredRenderer::submit(SubmitInfo const& submit_info) const
     cmd->end_render_pass();
 }
 
-auto DeferredRenderer::resize(u32 width, u32 height) -> std::expected<void, std::string>
+auto DeferredRenderer::resize(u32 width, u32 height) -> Common::Expected<void>
 {
     TRY_ASSIGN(m_gbuffer, create_gbuffer_textures(width, height));
 
@@ -103,7 +102,7 @@ auto DeferredRenderer::resize(u32 width, u32 height) -> std::expected<void, std:
     return {};
 }
 
-auto DeferredRenderer::create_gbuffer_textures(u32 width, u32 height) -> std::expected<GBuffer, std::string>
+auto DeferredRenderer::create_gbuffer_textures(u32 width, u32 height) -> Common::Expected<GBuffer>
 {
     GBuffer gbuffer {};
     RHI::Texture::Configuration gbuffer_texture_config {
@@ -146,7 +145,7 @@ auto DeferredRenderer::create_gbuffer_textures(u32 width, u32 height) -> std::ex
     return gbuffer;
 }
 
-auto DeferredRenderer::create_resources(Configuration const& config) -> std::expected<void, std::string>
+auto DeferredRenderer::create_resources(Configuration const& config) -> Common::Expected<void>
 {
     // --- Shaders --- //
     TRY_ASSIGN(m_geometry_vertex_shader, config.resource_manager->load_shader("Shaders/GeometryPass.vs"));
@@ -272,7 +271,7 @@ auto DeferredRenderer::create_resources(Configuration const& config) -> std::exp
     return {};
 }
 
-auto DeferredRenderer::create_passes(Configuration const& config) -> std::expected<void, std::string>
+auto DeferredRenderer::create_passes(Configuration const& config) -> Common::Expected<void>
 {
     // --- Shadow Pass --- //
     RHI::RenderPass::Configuration const shadow_render_pass_config {
@@ -341,7 +340,7 @@ auto DeferredRenderer::create_passes(Configuration const& config) -> std::expect
     return {};
 }
 
-auto DeferredRenderer::create_pipelines(Configuration const& config) -> std::expected<void, std::string>
+auto DeferredRenderer::create_pipelines(Configuration const& config) -> Common::Expected<void>
 {
     // --- Shadow Pipeline --- //
     RHI::Pipeline::VertexBinding const shadow_vertex_binding_config {
@@ -426,7 +425,7 @@ auto DeferredRenderer::create_pipelines(Configuration const& config) -> std::exp
     return {};
 }
 
-auto DeferredRenderer::create_output_render_target(RHI::Texture const* output_texture) const -> std::expected<std::unique_ptr<RHI::RenderTarget>, std::string>
+auto DeferredRenderer::create_output_render_target(RHI::Texture const* output_texture) const -> Common::Expected<std::unique_ptr<RHI::RenderTarget>>
 {
     RHI::RenderTarget::Configuration const render_target_config {
         .render_pass = m_lighting_render_pass.get(),

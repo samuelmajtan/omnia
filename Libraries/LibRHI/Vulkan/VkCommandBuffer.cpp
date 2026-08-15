@@ -7,14 +7,15 @@
 #include <cassert>
 #include <format>
 
+#include <Common/Expected.h>
 #include <LibRHI/Vulkan/VkBuffer.h>
 #include <LibRHI/Vulkan/VkCommandBuffer.h>
-#include <LibRHI/Vulkan/VkShader.h>
 #include <LibRHI/Vulkan/VkResourceSet.h>
+#include <LibRHI/Vulkan/VkShader.h>
 
 namespace RHI {
 
-auto VkCommandBuffer::create(VkCommandPool command_pool, const RHI::VkDevice* device) -> std::expected<VkCommandBuffer, std::string>
+auto VkCommandBuffer::create(VkCommandPool command_pool, const RHI::VkDevice* device) -> Common::Expected<VkCommandBuffer>
 {
     RHI::VkCommandBuffer command_buffer;
     VkCommandBufferAllocateInfo const command_buffer_allocate_info {
@@ -25,7 +26,7 @@ auto VkCommandBuffer::create(VkCommandPool command_pool, const RHI::VkDevice* de
         .commandBufferCount = 1
     };
     if (auto result = vkAllocateCommandBuffers(device->handle(), &command_buffer_allocate_info, &command_buffer.m_handle); result != VK_SUCCESS) {
-        return std::unexpected(std::format("Failed to allocate Vulkan command buffer: {}", string_VkResult(result)));
+        return OA_ERROR("Failed to allocate Vulkan command buffer: {}", string_VkResult(result));
     }
     return command_buffer;
 }

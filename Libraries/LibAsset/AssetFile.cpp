@@ -22,18 +22,18 @@ void AssetFileHeader::write(Binary::ByteWriter& writer) const
     writer.write<u64>(payload_size);
 }
 
-auto AssetFileHeader::read(Binary::ByteReader& reader) -> std::expected<AssetFileHeader, std::string>
+auto AssetFileHeader::read(Binary::ByteReader& reader) -> Common::Expected<AssetFileHeader>
 {
     u64 file_magic {};
     TRY_ASSIGN(file_magic, reader.read<u64>());
     if (file_magic != MAGIC) {
-        return std::unexpected("Not an Omnia asset file (bad magic).");
+        return OA_ERROR("Not an Omnia asset file (bad magic)");
     }
 
     u32 format_version {};
     TRY_ASSIGN(format_version, reader.read<u32>());
     if (format_version != VERSION) {
-        return std::unexpected(std::format("Cooked with asset format version {}, this build is {}.", format_version, VERSION));
+        return OA_ERROR("Cooked with asset format version {}, this build is {}", format_version, VERSION);
     }
 
     AssetType asset_type {};
@@ -51,7 +51,7 @@ auto AssetFileHeader::read(Binary::ByteReader& reader) -> std::expected<AssetFil
     u64 payload_size {};
     TRY_ASSIGN(payload_size, reader.read<u64>());
     if (payload_size > reader.remaining()) {
-        return std::unexpected(std::format("Truncated asset file: header declares a {} byte payload, {} bytes present.", payload_size, reader.remaining()));
+        return OA_ERROR("Truncated asset file: header declares a {} byte payload, {} bytes present", payload_size, reader.remaining());
     }
 
     return AssetFileHeader {

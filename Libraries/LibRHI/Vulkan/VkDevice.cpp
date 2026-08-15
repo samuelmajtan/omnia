@@ -7,6 +7,7 @@
 #include <format>
 #include <vector>
 
+#include <Common/Expected.h>
 #include <LibDebug/Logger.h>
 
 #define VMA_IMPLEMENTATION
@@ -68,7 +69,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(VkDebugUtilsMessageSever
     return VK_FALSE;
 }
 
-auto VkDevice::create(Configuration const& config) -> std::expected<std::unique_ptr<VkDevice>, std::string>
+auto VkDevice::create(Configuration const& config) -> Common::Expected<std::unique_ptr<VkDevice>>
 {
     std::unique_ptr<VkDevice> device(new VkDevice(config));
 
@@ -133,7 +134,7 @@ auto VkDevice::descriptor_pool() const -> VkDescriptorPool
     return m_descriptor_pools.back();
 }
 
-auto VkDevice::grow_descriptor_pool() -> std::expected<VkDescriptorPool, std::string>
+auto VkDevice::grow_descriptor_pool() -> Common::Expected<VkDescriptorPool>
 {
     m_descriptor_pool_capacity *= 2;
     return create_descriptor_pool()
@@ -227,7 +228,7 @@ auto VkDevice::select_physical_device(std::string_view name) -> bool
     return true;
 }
 
-auto VkDevice::create_instance() -> std::expected<void, std::string>
+auto VkDevice::create_instance() -> Common::Expected<void>
 {
     VkApplicationInfo const app_info {
         .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
@@ -277,7 +278,7 @@ auto VkDevice::create_instance() -> std::expected<void, std::string>
             }
         }
         if (!validation_layer_found) {
-            return std::unexpected("Vulkan validation layer requested but not available.");
+            return OA_ERROR("Vulkan validation layer requested but not available");
         }
 
         instance_info.enabledLayerCount = 1;
@@ -285,7 +286,7 @@ auto VkDevice::create_instance() -> std::expected<void, std::string>
     }
 
     if (auto result = vkCreateInstance(&instance_info, nullptr, &m_instance); result != VK_SUCCESS) {
-        return std::unexpected(std::format("Failed to create Vulkan instance: {}", string_VkResult(result)));
+        return OA_ERROR("Failed to create Vulkan instance: {}", string_VkResult(result));
     }
 
     if (m_config.enable_debug_layer) {
@@ -301,13 +302,13 @@ auto VkDevice::create_instance() -> std::expected<void, std::string>
 
         auto func = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(vkGetInstanceProcAddr(m_instance, "vkCreateDebugUtilsMessengerEXT"));
         if (auto result = func(m_instance, &debugMessengerCreateInfo, nullptr, &m_debug_messenger); result != VK_SUCCESS) {
-            return std::unexpected(std::format("Failed to create Vulkan debug messenger: {}", string_VkResult(result)));
+            return OA_ERROR("Failed to create Vulkan debug messenger: {}", string_VkResult(result));
         }
     }
     return {};
 }
 
-auto VkDevice::create_surface() -> std::expected<void, std::string>
+auto VkDevice::create_surface() -> Common::Expected<void>
 {
 #ifdef OA_OS_WINDOWS
     auto const* window = static_cast<Platform::WindowWin32 const*>(m_config.window);
@@ -321,24 +322,24 @@ auto VkDevice::create_surface() -> std::expected<void, std::string>
     };
 
     if (auto result = vkCreateWin32SurfaceKHR(m_instance, &surface_info, nullptr, &m_surface); result != VK_SUCCESS) {
-        return std::unexpected(std::format("Failed to create Vulkan surface: {}", string_VkResult(result)));
+        return OA_ERROR("Failed to create Vulkan surface: {}", string_VkResult(result));
     }
 #endif
     return {};
 }
 
-auto VkDevice::create_logical_device() -> std::expected<void, std::string>
+auto VkDevice::create_logical_device() -> Common::Expected<void>
 {
     u32 device_count = 0;
     if (auto result = vkEnumeratePhysicalDevices(m_instance, &device_count, nullptr); result != VK_SUCCESS) {
-        return std::unexpected(std::format("Failed to retrieve Vulkan physical devices: {}", string_VkResult(result)));
+        return OA_ERROR("Failed to retrieve Vulkan physical devices: {}", string_VkResult(result));
     }
     if (device_count == 0) {
-        return std::unexpected("No Vulkan physical devices found.");
+        return OA_ERROR("No Vulkan physical devices found");
     }
     std::vector<::VkPhysicalDevice> physical_devices(device_count);
     if (auto result = vkEnumeratePhysicalDevices(m_instance, &device_count, physical_devices.data()); result != VK_SUCCESS) {
-        return std::unexpected(std::format("Failed to retrieve Vulkan physical devices: {}", string_VkResult(result)));
+        return OA_ERROR("Failed to retrieve Vulkan physical devices: {}", string_VkResult(result));
     }
 
     for (auto const& vk_device : physical_devices) {
@@ -348,7 +349,7 @@ auto VkDevice::create_logical_device() -> std::expected<void, std::string>
         }
     }
     if (m_physical_devices.empty()) {
-        return std::unexpected("No suitable Vulkan physical devices found.");
+        return OA_ERROR("No suitable Vulkan physical devices found");
     }
     m_physical_device = &m_physical_devices.begin()->second;
 
@@ -398,7 +399,7 @@ auto VkDevice::create_logical_device() -> std::expected<void, std::string>
     };
 
     if (auto result = vkCreateDevice(m_physical_device->handle(), &device_create_info, nullptr, &m_logical_device); result != VK_SUCCESS) {
-        return std::unexpected(std::format("Failed to create Vulkan logical device: {}", string_VkResult(result)));
+        return OA_ERROR("Failed to create Vulkan logical device: {}", string_VkResult(result));
     }
     vkGetDeviceQueue(m_logical_device, graphics_index, 0, &m_graphics_queue);
     vkGetDeviceQueue(m_logical_device, present_index, 0, &m_present_queue);
@@ -406,7 +407,7 @@ auto VkDevice::create_logical_device() -> std::expected<void, std::string>
     return {};
 }
 
-auto VkDevice::create_allocator() -> std::expected<void, std::string>
+auto VkDevice::create_allocator() -> Common::Expected<void>
 {
     VmaAllocatorCreateInfo const allocator_info {
         .flags = 0,
@@ -423,12 +424,12 @@ auto VkDevice::create_allocator() -> std::expected<void, std::string>
     };
 
     if (auto result = vmaCreateAllocator(&allocator_info, &m_allocator); result != VK_SUCCESS) {
-        return std::unexpected(std::format("Failed to create Vulkan memory allocator: {}", string_VkResult(result)));
+        return OA_ERROR("Failed to create Vulkan memory allocator: {}", string_VkResult(result));
     }
     return {};
 }
 
-auto VkDevice::create_command_pools() -> std::expected<void, std::string>
+auto VkDevice::create_command_pools() -> Common::Expected<void>
 {
     auto [graphics_index, present_index, transfer_index] = m_physical_device->queue_family_indices();
 
@@ -439,7 +440,7 @@ auto VkDevice::create_command_pools() -> std::expected<void, std::string>
         .queueFamilyIndex = transfer_index
     };
     if (auto result = vkCreateCommandPool(m_logical_device, &tranfer_pool_create_info, nullptr, &m_transfer_command_pool); result != VK_SUCCESS) {
-        return std::unexpected(std::format("Failed to create Vulkan graphics command pool: {}", string_VkResult(result)));
+        return OA_ERROR("Failed to create Vulkan graphics command pool: {}", string_VkResult(result));
     }
 
     VkCommandPoolCreateInfo const graphics_pool_create_info {
@@ -449,19 +450,15 @@ auto VkDevice::create_command_pools() -> std::expected<void, std::string>
         .queueFamilyIndex = graphics_index
     };
     if (auto result = vkCreateCommandPool(m_logical_device, &graphics_pool_create_info, nullptr, &m_graphics_command_pool); result != VK_SUCCESS) {
-        return std::unexpected(std::format("Failed to create Vulkan graphics command pool: {}", string_VkResult(result)));
+        return OA_ERROR("Failed to create Vulkan graphics command pool: {}", string_VkResult(result));
     }
 
-    auto graphics_command_buffer = VkCommandBuffer::create(m_graphics_command_pool, this);
-    if (!graphics_command_buffer) {
-        return std::unexpected(graphics_command_buffer.error());
-    }
-    m_graphics_command_buffer = std::move(graphics_command_buffer.value());
+    TRY_ASSIGN(m_graphics_command_buffer, VkCommandBuffer::create(m_graphics_command_pool, this));
 
     return {};
 }
 
-auto VkDevice::create_descriptor_pool() -> std::expected<void, std::string>
+auto VkDevice::create_descriptor_pool() -> Common::Expected<void>
 {
     std::vector<::VkDescriptorPoolSize> pool_sizes = {
         { .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = m_descriptor_pool_capacity },
@@ -479,58 +476,58 @@ auto VkDevice::create_descriptor_pool() -> std::expected<void, std::string>
 
     ::VkDescriptorPool descriptor_pool {};
     if (auto result = vkCreateDescriptorPool(m_logical_device, &descriptor_pool_create_info, nullptr, &descriptor_pool); result != VK_SUCCESS) {
-        return std::unexpected(std::format("Failed to create descriptor pool: {}", string_VkResult(result)));
+        return OA_ERROR("Failed to create descriptor pool: {}", string_VkResult(result));
     }
     m_descriptor_pools.push_back(descriptor_pool);
     return {};
 }
 
-auto VkDevice::create_pipeline(Pipeline::Configuration const& config) const -> std::expected<std::unique_ptr<Pipeline>, std::string>
+auto VkDevice::create_pipeline(Pipeline::Configuration const& config) const -> Common::Expected<std::unique_ptr<Pipeline>>
 {
     return VkPipeline::create(config, this);
 }
 
-auto VkDevice::create_render_pass(RenderPass::Configuration const& config) const -> std::expected<std::unique_ptr<RenderPass>, std::string>
+auto VkDevice::create_render_pass(RenderPass::Configuration const& config) const -> Common::Expected<std::unique_ptr<RenderPass>>
 {
     return VkRenderPass::create(config, this);
 }
 
-auto VkDevice::create_render_target(RenderTarget::Configuration const& config) const -> std::expected<std::unique_ptr<RenderTarget>, std::string>
+auto VkDevice::create_render_target(RenderTarget::Configuration const& config) const -> Common::Expected<std::unique_ptr<RenderTarget>>
 {
     return VkRenderTarget::create(config, this);
 }
 
-auto VkDevice::create_resource_layout(ResourceLayout::Configuration const& config) const -> std::expected<std::unique_ptr<ResourceLayout>, std::string>
+auto VkDevice::create_resource_layout(ResourceLayout::Configuration const& config) const -> Common::Expected<std::unique_ptr<ResourceLayout>>
 {
     return VkResourceLayout::create(config, this);
 }
 
-auto VkDevice::create_resource_set(ResourceSet::Configuration const& config) -> std::expected<std::unique_ptr<ResourceSet>, std::string>
+auto VkDevice::create_resource_set(ResourceSet::Configuration const& config) -> Common::Expected<std::unique_ptr<ResourceSet>>
 {
     return VkResourceSet::create(config, this);
 }
 
-auto VkDevice::create_sampler(Sampler::Configuration const& config) const -> std::expected<std::unique_ptr<Sampler>, std::string>
+auto VkDevice::create_sampler(Sampler::Configuration const& config) const -> Common::Expected<std::unique_ptr<Sampler>>
 {
     return VkSampler::create(config, this);
 }
 
-auto VkDevice::create_buffer(Buffer::Configuration const& config) const -> std::expected<std::unique_ptr<Buffer>, std::string>
+auto VkDevice::create_buffer(Buffer::Configuration const& config) const -> Common::Expected<std::unique_ptr<Buffer>>
 {
     return VkBuffer::create(config, this);
 }
 
-auto VkDevice::create_shader(Shader::Configuration const& config) const -> std::expected<std::unique_ptr<Shader>, std::string>
+auto VkDevice::create_shader(Shader::Configuration const& config) const -> Common::Expected<std::unique_ptr<Shader>>
 {
     return VkShader::create(config, this);
 }
 
-auto VkDevice::create_swapchain(Swapchain::Configuration const& config) const -> std::expected<std::unique_ptr<Swapchain>, std::string>
+auto VkDevice::create_swapchain(Swapchain::Configuration const& config) const -> Common::Expected<std::unique_ptr<Swapchain>>
 {
     return VkSwapchain::create(config, this);
 }
 
-auto VkDevice::create_texture(Texture::Configuration const& config) const -> std::expected<std::unique_ptr<Texture>, std::string>
+auto VkDevice::create_texture(Texture::Configuration const& config) const -> Common::Expected<std::unique_ptr<Texture>>
 {
     return VkTexture::create_owned(config, this);
 }

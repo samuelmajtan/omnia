@@ -6,6 +6,7 @@
 
 #include <format>
 
+#include <Common/Expected.h>
 #include <LibAsset/AssetManager.h>
 
 namespace Asset {
@@ -50,12 +51,12 @@ auto AssetManager::cooked_asset_path(AssetID id) const -> std::filesystem::path
     return m_cache_root / std::format("{}{}", id.to_string(), COOKED_FILE_EXTENSION);
 }
 
-auto AssetManager::load_loose_assets() -> std::expected<void, std::string>
+auto AssetManager::load_loose_assets() -> Common::Expected<void>
 {
     return m_asset_registry.scan();
 }
 
-auto AssetManager::load_packed_assets() -> std::expected<void, std::string>
+auto AssetManager::load_packed_assets() -> Common::Expected<void>
 {
     return {};
 }

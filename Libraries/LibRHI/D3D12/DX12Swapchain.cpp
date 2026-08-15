@@ -4,11 +4,12 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+#include <Common/Expected.h>
 #include <LibRHI/D3D12/DX12Swapchain.h>
 
 namespace RHI {
 
-auto DX12Swapchain::create(Configuration const& config) -> std::expected<std::unique_ptr<DX12Swapchain>, std::string>
+auto DX12Swapchain::create(Configuration const& config) -> Common::Expected<std::unique_ptr<DX12Swapchain>>
 {
     (void)config;
     std::unique_ptr<DX12Swapchain> swapchain(new DX12Swapchain);
@@ -47,7 +48,7 @@ auto DX12Swapchain::is_dirty() const -> bool
     return false;
 }
 
-auto DX12Swapchain::recreate(const RHI::Swapchain::Configuration& config) -> std::expected<void, std::string>
+auto DX12Swapchain::recreate(const RHI::Swapchain::Configuration& config) -> Common::Expected<void>
 {
     (void)config;
     return {};

@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <Common/Expected.h>
 #include <Common/Noncopyable.h>
 #include <LibRHI/Vulkan/VkDevice.h>
 
@@ -16,7 +17,7 @@ class VkStagingBuffer final {
     OA_MAKE_DEFAULT_CONSTRUCTIBLE(VkStagingBuffer);
 
 public:
-    static auto create(VkDevice const* device, u64 size) -> std::expected<VkStagingBuffer, std::string>;
+    static auto create(VkDevice const* device, u64 size) -> Common::Expected<VkStagingBuffer>;
 
     VkStagingBuffer(VkStagingBuffer&& other);
     auto operator=(VkStagingBuffer&& other) -> VkStagingBuffer&;

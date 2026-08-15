@@ -13,6 +13,7 @@
 #include <vector>
 
 #include <Common/ByteStream.h>
+#include <Common/Expected.h>
 #include <Common/Types.h>
 #include <LibAsset/Asset.h>
 #include <LibAsset/Export.h>
@@ -34,10 +35,10 @@ struct ASSET_API AssetTraits<ShaderData> {
     static constexpr auto VERSION = ShaderImporter::VERSION;
 
     static auto extensions() -> std::vector<std::string>;
-    static auto import(ImportContext const& context) -> std::expected<ShaderData, std::string>;
-    static auto source_hash(ImportContext const& context) -> std::expected<u64, std::string>;
+    static auto import(ImportContext const& context) -> Common::Expected<ShaderData>;
+    static auto source_hash(ImportContext const& context) -> Common::Expected<u64>;
     static void write(Binary::ByteWriter& writer, ShaderData const& data);
-    static auto read(Binary::ByteReader& reader) -> std::expected<ShaderData, std::string>;
+    static auto read(Binary::ByteReader& reader) -> Common::Expected<ShaderData>;
 };
 
 template<>
@@ -48,10 +49,10 @@ struct ASSET_API AssetTraits<TextureData> {
     static constexpr auto VERSION = TextureImporter::VERSION;
 
     static auto extensions() -> std::vector<std::string>;
-    static auto import(ImportContext const& context) -> std::expected<TextureData, std::string>;
-    static auto source_hash(ImportContext const& context) -> std::expected<u64, std::string>;
+    static auto import(ImportContext const& context) -> Common::Expected<TextureData>;
+    static auto source_hash(ImportContext const& context) -> Common::Expected<u64>;
     static void write(Binary::ByteWriter& writer, TextureData const& data);
-    static auto read(Binary::ByteReader& reader) -> std::expected<TextureData, std::string>;
+    static auto read(Binary::ByteReader& reader) -> Common::Expected<TextureData>;
 };
 
 template<>
@@ -62,10 +63,10 @@ struct ASSET_API AssetTraits<ModelData> {
     static constexpr auto VERSION = ModelImporter::VERSION;
 
     static auto extensions() -> std::vector<std::string>;
-    static auto import(ImportContext const& context) -> std::expected<ModelData, std::string>;
-    static auto source_hash(ImportContext const& context) -> std::expected<u64, std::string>;
+    static auto import(ImportContext const& context) -> Common::Expected<ModelData>;
+    static auto source_hash(ImportContext const& context) -> Common::Expected<u64>;
     static void write(Binary::ByteWriter& writer, ModelData const& data);
-    static auto read(Binary::ByteReader& reader) -> std::expected<ModelData, std::string>;
+    static auto read(Binary::ByteReader& reader) -> Common::Expected<ModelData>;
 };
 
 template<typename T>
@@ -73,10 +74,10 @@ concept AssetData = requires(ImportContext const& context, Binary::ByteWriter& w
     { AssetTraits<T>::TYPE } -> std::convertible_to<AssetType>;
     { AssetTraits<T>::VERSION } -> std::convertible_to<u32>;
     { AssetTraits<T>::extensions() } -> std::same_as<std::vector<std::string>>;
-    { AssetTraits<T>::import(context) } -> std::same_as<std::expected<T, std::string>>;
-    { AssetTraits<T>::source_hash(context) } -> std::same_as<std::expected<u64, std::string>>;
+    { AssetTraits<T>::import(context) } -> std::same_as<Common::Expected<T>>;
+    { AssetTraits<T>::source_hash(context) } -> std::same_as<Common::Expected<u64>>;
     { AssetTraits<T>::write(writer, value) };
-    { AssetTraits<T>::read(reader) } -> std::same_as<std::expected<T, std::string>>;
+    { AssetTraits<T>::read(reader) } -> std::same_as<Common::Expected<T>>;
 };
 
 inline auto asset_type_for(std::filesystem::path const& path) -> std::optional<AssetType>

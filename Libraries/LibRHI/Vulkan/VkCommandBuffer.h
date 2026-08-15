@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <Common/Expected.h>
 #include <Common/Noncopyable.h>
 #include <LibRHI/CommandBuffer.h>
 #include <LibRHI/Vulkan/VkPipeline.h>
@@ -22,7 +23,7 @@ class VkCommandBuffer final : public CommandBuffer {
 public:
     ~VkCommandBuffer() override = default;
 
-    static auto create(VkCommandPool command_pool, RHI::VkDevice const* device) -> std::expected<VkCommandBuffer, std::string>;
+    static auto create(VkCommandPool command_pool, RHI::VkDevice const* device) -> Common::Expected<VkCommandBuffer>;
 
     auto handle() const -> ::VkCommandBuffer;
     void reset() const override;

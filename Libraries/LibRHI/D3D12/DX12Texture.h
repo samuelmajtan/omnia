@@ -10,6 +10,7 @@
 #include <memory>
 #include <string>
 
+#include <Common/Expected.h>
 #include <Common/Noncopyable.h>
 #include <LibRHI/Texture.h>
 
@@ -20,7 +21,7 @@ class DX12Texture final : public Texture {
     OA_MAKE_NONMOVABLE(DX12Texture);
 
 public:
-    static auto create(Configuration const& config) -> std::expected<std::unique_ptr<DX12Texture>, std::string>;
+    static auto create(Configuration const& config) -> Common::Expected<std::unique_ptr<DX12Texture>>;
 
     ~DX12Texture() override;
 

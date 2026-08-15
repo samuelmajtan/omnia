@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <Common/Expected.h>
 #include <LibAsset/Export.h>
 #include <LibAsset/Importer.h>
 #include <LibGraphics/ShaderTypes.h>
@@ -19,8 +20,8 @@ public:
     static constexpr u32 VERSION = 1;
 
 public:
-    static auto import(ImportContext const& context) -> std::expected<ShaderData, std::string>;
-    static auto source_hash(ImportContext const& context) -> std::expected<u64, std::string>;
+    static auto import(ImportContext const& context) -> Common::Expected<ShaderData>;
+    static auto source_hash(ImportContext const& context) -> Common::Expected<u64>;
     static auto supported_extensions() -> std::vector<std::string>;
 };
 

@@ -8,19 +8,20 @@
 #include <cgltf.h>
 #include <unordered_map>
 
+#include <Common/Expected.h>
 #include <Common/File.h>
 #include <LibAsset/ModelImporter.h>
 
 namespace Asset {
 
-auto ModelImporter::import(ImportContext const& context) -> std::expected<ModelData, std::string>
+auto ModelImporter::import(ImportContext const& context) -> Common::Expected<ModelData>
 {
     if (context.registry == nullptr) {
-        return std::unexpected(std::format("Cannot import '{}' without an asset registry to resolve its textures against.", context.path.string()));
+        return OA_ERROR("Cannot import '{}' without an asset registry to resolve its textures against", context.path.string());
     }
 
     if (!std::filesystem::exists(context.path)) {
-        return std::unexpected(std::format("Model file '{}' does not exist", context.path.string()));
+        return OA_ERROR("Model file '{}' does not exist", context.path.string());
     }
 
     auto extension = context.path.extension().string();
@@ -28,10 +29,10 @@ auto ModelImporter::import(ImportContext const& context) -> std::expected<ModelD
         return import_gltf(context);
     }
 
-    return std::unexpected(std::format("Unsupported model file extension '{}'", extension));
+    return OA_ERROR("Unsupported model file extension '{}'", extension);
 }
 
-auto ModelImporter::source_hash(ImportContext const& context) -> std::expected<u64, std::string>
+auto ModelImporter::source_hash(ImportContext const& context) -> Common::Expected<u64>
 {
     return File::hash_file(context.path);
 }
@@ -41,27 +42,25 @@ auto ModelImporter::supported_extensions() -> std::vector<std::string>
     return { ".gltf" };
 }
 
-auto ModelImporter::import_gltf(ImportContext const& context) -> std::expected<ModelData, std::string>
+auto ModelImporter::import_gltf(ImportContext const& context) -> Common::Expected<ModelData>
 {
     auto const& path = context.path;
     auto const* asset_registry = context.registry;
-    auto file_data = File::read_all(path);
-    if (!file_data) {
-        return std::unexpected(std::move(file_data).error());
-    }
+    std::string file_data;
+    TRY_ASSIGN(file_data, File::read_all(path));
 
     cgltf_options const options {};
     cgltf_data* data = nullptr;
-    if (cgltf_parse(&options, file_data->data(), file_data->size(), &data) != cgltf_result_success) {
-        return std::unexpected(std::format("Failed to parse glTF file '{}'", path.string()));
+    if (cgltf_parse(&options, file_data.data(), file_data.size(), &data) != cgltf_result_success) {
+        return OA_ERROR("Failed to parse glTF file '{}'", path.string());
     }
     if (cgltf_load_buffers(&options, data, path.string().c_str()) != cgltf_result_success) {
         cgltf_free(data);
-        return std::unexpected(std::format("Failed to load buffers for glTF file '{}'", path.string()));
+        return OA_ERROR("Failed to load buffers for glTF file '{}'", path.string());
     }
     if (cgltf_validate(data) != cgltf_result_success) {
         cgltf_free(data);
-        return std::unexpected(std::format("Invalid glTF file '{}'", path.string()));
+        return OA_ERROR("Invalid glTF file '{}'", path.string());
     }
 
     ModelData model_data;

@@ -10,6 +10,7 @@
 #include <memory>
 #include <string>
 
+#include <Common/Expected.h>
 #include <Common/Noncopyable.h>
 #include <Common/Types.h>
 #include <LibPlatform/Export.h>
@@ -41,7 +42,7 @@ public:
     virtual auto width() const -> i32 = 0;
     virtual auto height() const -> i32 = 0;
 
-    static auto PLATFORM_API create(Configuration const& config) -> std::expected<std::unique_ptr<Window>, std::string>;
+    static auto PLATFORM_API create(Configuration const& config) -> Common::Expected<std::unique_ptr<Window>>;
 protected:
     Window() = default;
 };

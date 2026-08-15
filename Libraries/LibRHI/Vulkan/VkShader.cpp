@@ -7,11 +7,12 @@
 #include <cassert>
 #include <format>
 
+#include <Common/Expected.h>
 #include <LibRHI/Vulkan/VkShader.h>
 
 namespace RHI {
 
-auto VkShader::create(Configuration const& config, RHI::VkDevice const* device) -> std::expected<std::unique_ptr<VkShader>, std::string>
+auto VkShader::create(Configuration const& config, RHI::VkDevice const* device) -> Common::Expected<std::unique_ptr<VkShader>>
 {
     std::unique_ptr<VkShader> shader(new VkShader(config, device));
 
@@ -26,7 +27,7 @@ auto VkShader::create(Configuration const& config, RHI::VkDevice const* device) 
         .pCode = reinterpret_cast<u32 const*>(variant_it->bytecode.data())
     };
     if (auto result = vkCreateShaderModule(device->handle(), &shader_module_create_info, nullptr, &shader->m_handle); result != VK_SUCCESS) {
-        return std::unexpected(std::format("Failed to create vulkan shader module: {}", string_VkResult(result)));
+        return OA_ERROR("Failed to create vulkan shader module: {}", string_VkResult(result));
     }
 
     return shader;

@@ -7,15 +7,19 @@
 #include <set>
 
 #include <Common/Expected.h>
+
 #include <Common/File.h>
 #include <Common/Hash.h>
 #include <Common/String.h>
 #include <LibAsset/ShaderCompiler.h>
 #include <LibAsset/ShaderImporter.h>
+#include <LibDebug/Logger.h>
 
 namespace Asset {
 
 namespace {
+
+constexpr Debug::Logger Logger("Shader Importer");
 
 // Extract the path of included file from a line, TODO: Seems like this is not very robust, use a regex?
 auto included_path(std::string_view line) -> std::optional<std::string_view>
@@ -42,6 +46,7 @@ void collect_includes(std::filesystem::path const& base, std::filesystem::path c
 {
     auto const lines = File::read_lines(file);
     if (!lines.has_value()) {
+        Logger.warn("Ignoring {} while hashing shader includes: {}", file.string(), lines.error());
         return;
     }
 
@@ -54,6 +59,7 @@ void collect_includes(std::filesystem::path const& base, std::filesystem::path c
         auto resolved = (base / target.value()).lexically_normal();
         std::error_code error;
         if (!std::filesystem::exists(resolved, error) || error) {
+            Logger.warn("Ignoring include '{}' of {}: it does not exist, so changes to it will not invalidate the cooked shader", target.value(), file.string());
             continue;
         }
 
@@ -65,15 +71,15 @@ void collect_includes(std::filesystem::path const& base, std::filesystem::path c
 
 }
 
-auto ShaderImporter::import(ImportContext const& context) -> std::expected<ShaderData, std::string>
+auto ShaderImporter::import(ImportContext const& context) -> Common::Expected<ShaderData>
 {
     auto const& path = context.path;
     if (!std::filesystem::exists(path)) {
-        return std::unexpected(std::format("Shader file '{}' does not exist", path.string()));
+        return OA_ERROR("Shader file '{}' does not exist", path.string());
     }
 
     if (!claims_extension(path, supported_extensions())) {
-        return std::unexpected(std::format("'{}' is not a shader: expected a .vs.glsl or .fs.glsl suffix", path.filename().string()));
+        return OA_ERROR("'{}' is not a shader: expected a .vs.glsl or .fs.glsl suffix", path.filename().string());
     }
 
     auto file_name = path.stem().string();
@@ -84,34 +90,27 @@ auto ShaderImporter::import(ImportContext const& context) -> std::expected<Shade
     } else if (shader_stage_string == "fs") {
         shader_stage = Graphics::ShaderStage::Fragment;
     } else {
-        return std::unexpected(std::format("Unsupported shader stage '{}'", shader_stage_string));
+        return OA_ERROR("Unsupported shader stage '{}'", shader_stage_string);
     }
 
     ShaderData shader_data;
     shader_data.stage = shader_stage;
 
-    auto file_content = File::read_all(path);
-    if (!file_content) {
-        return std::unexpected(file_content.error());
-    }
+    std::string file_content;
+    TRY_ASSIGN(file_content, File::read_all(path));
 
     {
         Graphics::ShaderVariant spirv_variant;
         spirv_variant.format = Graphics::ShaderFormat::SPIRV;
 
-        auto compiled_spirv = ShaderCompiler::compile_spirv(path, file_content.value(), shader_stage);
-        if (!compiled_spirv) {
-            return std::unexpected(compiled_spirv.error());
-        }
-
-        spirv_variant.bytecode = std::move(compiled_spirv.value());
+        TRY_ASSIGN(spirv_variant.bytecode, ShaderCompiler::compile_spirv(path, file_content, shader_stage));
         shader_data.variants.push_back(spirv_variant);
     }
 
     return shader_data;
 }
 
-auto ShaderImporter::source_hash(ImportContext const& context) -> std::expected<u64, std::string>
+auto ShaderImporter::source_hash(ImportContext const& context) -> Common::Expected<u64>
 {
     auto const& path = context.path;
 

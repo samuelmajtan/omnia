@@ -7,6 +7,7 @@
 #include <cassert>
 #include <format>
 
+#include <Common/Expected.h>
 #include <LibRHI/Vulkan/VkBuffer.h>
 #include <LibRHI/Vulkan/VkResourceLayout.h>
 #include <LibRHI/Vulkan/VkResourceSet.h>
@@ -15,7 +16,7 @@
 
 namespace RHI {
 
-auto VkResourceSet::create(Configuration const& config, RHI::VkDevice* device) -> std::expected<std::unique_ptr<VkResourceSet>, std::string>
+auto VkResourceSet::create(Configuration const& config, RHI::VkDevice* device) -> Common::Expected<std::unique_ptr<VkResourceSet>>
 {
     std::unique_ptr<VkResourceSet> resource_set(new VkResourceSet(config, device));
 
@@ -33,11 +34,11 @@ auto VkResourceSet::create(Configuration const& config, RHI::VkDevice* device) -
         if (auto new_pool = device->grow_descriptor_pool()) {
             descriptor_set_allocate_info.descriptorPool = *new_pool;
             if (auto regrow_result = vkAllocateDescriptorSets(device->handle(), &descriptor_set_allocate_info, &resource_set->m_handle); regrow_result != VK_SUCCESS) {
-                return std::unexpected(std::format("Failed to allocate descriptor set after growing pool: {}", string_VkResult(result)));
+                return OA_ERROR("Failed to allocate descriptor set after growing pool: {}", string_VkResult(result));
             }
         }
     } else if (result != VK_SUCCESS) {
-        return std::unexpected(std::format("Failed to allocate descriptor set: {}", string_VkResult(result)));
+        return OA_ERROR("Failed to allocate descriptor set: {}", string_VkResult(result));
     }
 
     return resource_set;

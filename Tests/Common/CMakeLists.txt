@@ -1,5 +1,6 @@
 set(SOURCES
     ByteStream.test.cpp
+    Error.test.cpp
     File.test.cpp
     Hash.test.cpp
     Random.test.cpp

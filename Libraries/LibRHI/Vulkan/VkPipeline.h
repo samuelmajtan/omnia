@@ -10,6 +10,7 @@
 #include <memory>
 #include <string>
 
+#include <Common/Expected.h>
 #include <LibRHI/Pipeline.h>
 #include <LibRHI/Vulkan/VkCommon.h>
 
@@ -19,7 +20,7 @@ class VkDevice;
 
 class VkPipeline final : public Pipeline {
 public:
-    static auto create(Configuration const& config, RHI::VkDevice const* device) -> std::expected<std::unique_ptr<VkPipeline>, std::string>;
+    static auto create(Configuration const& config, RHI::VkDevice const* device) -> Common::Expected<std::unique_ptr<VkPipeline>>;
 
     ~VkPipeline() override;
 

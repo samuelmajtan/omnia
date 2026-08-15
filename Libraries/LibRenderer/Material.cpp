@@ -4,11 +4,12 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+#include <Common/Expected.h>
 #include <LibRenderer/Material.h>
 
 namespace Renderer {
 
-auto Material::create(Configuration const& configuration, RHI::Device* device) -> std::expected<Material, std::string>
+auto Material::create(Configuration const& configuration, RHI::Device* device) -> Common::Expected<Material>
 {
     assert(configuration.resource_layout != nullptr);
     assert(configuration.albedo_texture != nullptr);
@@ -19,22 +20,14 @@ auto Material::create(Configuration const& configuration, RHI::Device* device) -
     auto resource_set_configuration = RHI::ResourceSet::Configuration {
         .layout = configuration.resource_layout,
     };
-    auto resource_set_result = device->create_resource_set(resource_set_configuration);
-    if (!resource_set_result.has_value()) {
-        return std::unexpected(std::move(resource_set_result).error());
-    }
-    material.m_resource_set = std::move(resource_set_result).value();
+    TRY_ASSIGN(material.m_resource_set, device->create_resource_set(resource_set_configuration));
 
     auto uniform_buffer_configuration = RHI::Buffer::Configuration {
         .size = sizeof(Graphics::MaterialParameters),
         .usage = RHI::BufferUsage::Uniform,
         .data = &material.m_parameters
     };
-    auto uniform_buffer_result = device->create_buffer(uniform_buffer_configuration);
-    if (!uniform_buffer_result.has_value()) {
-        return std::unexpected(std::move(uniform_buffer_result).error());
-    }
-    material.m_uniform_buffer = std::move(uniform_buffer_result).value();
+    TRY_ASSIGN(material.m_uniform_buffer, device->create_buffer(uniform_buffer_configuration));
 
     material.m_resource_set->set_uniform_buffer(0, material.m_uniform_buffer.get());
     material.m_resource_set->set_texture(1, configuration.albedo_texture);

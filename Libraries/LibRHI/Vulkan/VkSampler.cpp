@@ -7,11 +7,12 @@
 #include <cassert>
 #include <format>
 
+#include <Common/Expected.h>
 #include <LibRHI/Vulkan/VkSampler.h>
 
 namespace RHI {
 
-auto VkSampler::create(Configuration const& config, RHI::VkDevice const* device) -> std::expected<std::unique_ptr<VkSampler>, std::string>
+auto VkSampler::create(Configuration const& config, RHI::VkDevice const* device) -> Common::Expected<std::unique_ptr<VkSampler>>
 {
     std::unique_ptr<VkSampler> sampler(new VkSampler(device));
 
@@ -37,7 +38,7 @@ auto VkSampler::create(Configuration const& config, RHI::VkDevice const* device)
     };
 
     if (auto result = vkCreateSampler(device->handle(), &sampler_create_info, nullptr, &sampler->m_handle); result != VK_SUCCESS) {
-        return std::unexpected(std::format("Failed to create Vulkan sampler: {}", string_VkResult(result)));
+        return OA_ERROR("Failed to create Vulkan sampler: {}", string_VkResult(result));
     }
 
     return sampler;

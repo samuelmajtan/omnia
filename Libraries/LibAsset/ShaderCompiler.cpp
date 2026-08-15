@@ -7,6 +7,7 @@
 #include <array>
 #include <shaderc/shaderc.hpp>
 
+#include <Common/Expected.h>
 #include <Common/File.h>
 #include <LibAsset/ShaderCompiler.h>
 
@@ -42,7 +43,7 @@ public:
             data[1] = content.value();
         } else {
             data[0] = "";
-            data[1] = content.error();
+            data[1] = std::string(content.error().message());
         }
         result->source_name = data[0].c_str();
         result->source_name_length = data[0].size();
@@ -62,7 +63,7 @@ private:
     std::filesystem::path m_base_path;
 };
 
-auto compile_spirv(std::filesystem::path const& shader_path, std::string_view glsl_source, Graphics::ShaderStage stage) -> std::expected<std::vector<u8>, std::string>
+auto compile_spirv(std::filesystem::path const& shader_path, std::string_view glsl_source, Graphics::ShaderStage stage) -> Common::Expected<std::vector<u8>>
 {
     shaderc::Compiler const compiler;
     shaderc::CompileOptions options;
@@ -71,7 +72,7 @@ auto compile_spirv(std::filesystem::path const& shader_path, std::string_view gl
 
     auto const result = compiler.CompileGlslToSpv(glsl_source.data(), glsl_source.size(), to_shaderc(stage), shader_path.filename().string().c_str(), options);
     if (result.GetCompilationStatus() != shaderc_compilation_status_success) {
-        return std::unexpected(std::format("Failed to compile SPIR-V: {}", result.GetErrorMessage()));
+        return OA_ERROR("Failed to compile shader '{}': {}", shader_path.string(), result.GetErrorMessage());
     }
 
     std::vector<u32> temp(result.cbegin(), result.cend());

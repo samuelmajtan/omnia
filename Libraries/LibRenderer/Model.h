@@ -9,6 +9,7 @@
 #include <expected>
 #include <string>
 
+#include <Common/Expected.h>
 #include <LibRenderer/Export.h>
 #include <LibRenderer/Material.h>
 #include <LibRenderer/SubMesh.h>
@@ -26,15 +27,15 @@ public:
         std::vector<Material::Configuration> materials;
     };
 
-    static auto create(Configuration const& configuration, RHI::Device* device) -> std::expected<std::unique_ptr<Model>, std::string>;
+    static auto create(Configuration const& configuration, RHI::Device* device) -> Common::Expected<std::unique_ptr<Model>>;
 
     auto sub_meshes() const -> std::vector<SubMesh> const&;
     auto materials() const -> std::vector<Material> const&;
 private:
     Model() = default;
 
-    auto create_sub_meshes(std::vector<SubMesh::Configuration> const& configurations, RHI::Device const* device) -> std::expected<void, std::string>;
-    auto create_materials(std::vector<Material::Configuration> const& configurations, RHI::Device* device) -> std::expected<void, std::string>;
+    auto create_sub_meshes(std::vector<SubMesh::Configuration> const& configurations, RHI::Device const* device) -> Common::Expected<void>;
+    auto create_materials(std::vector<Material::Configuration> const& configurations, RHI::Device* device) -> Common::Expected<void>;
 private:
     std::vector<SubMesh> m_sub_meshes;
     std::vector<Material> m_materials;

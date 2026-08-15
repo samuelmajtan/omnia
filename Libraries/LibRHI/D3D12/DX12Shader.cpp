@@ -4,11 +4,12 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+#include <Common/Expected.h>
 #include <LibRHI/D3D12/DX12Shader.h>
 
 namespace RHI {
 
-auto DX12Shader::create(Configuration const& config) -> std::expected<std::unique_ptr<DX12Shader>, std::string>
+auto DX12Shader::create(Configuration const& config) -> Common::Expected<std::unique_ptr<DX12Shader>>
 {
     std::unique_ptr<DX12Shader> shader(new DX12Shader);
     shader->m_config = config;

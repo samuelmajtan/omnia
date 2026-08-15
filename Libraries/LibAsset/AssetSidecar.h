@@ -12,6 +12,7 @@
 #include <string>
 #include <unordered_map>
 
+#include <Common/Expected.h>
 #include <Common/Types.h>
 #include <LibAsset/Asset.h>
 #include <LibAsset/Export.h>
@@ -28,9 +29,9 @@ public:
     AssetSidecar(AssetID id, AssetType type);
 
     static auto path_for(std::filesystem::path const& source_path) -> std::filesystem::path;
-    static auto load(std::filesystem::path const& sidecar_path) -> std::expected<AssetSidecar, std::string>;
+    static auto load(std::filesystem::path const& sidecar_path) -> Common::Expected<AssetSidecar>;
 
-    auto save(std::filesystem::path const& sidecar_path) const -> std::expected<void, std::string>;
+    auto save(std::filesystem::path const& sidecar_path) const -> Common::Expected<void>;
 
     auto id() const -> AssetID;
     auto type() const -> AssetType;

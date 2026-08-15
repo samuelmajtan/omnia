@@ -10,11 +10,12 @@
 #include <string>
 #include <vector>
 
+#include <Common/Expected.h>
 #include <Common/Types.h>
 #include <LibAsset/ShaderImporter.h>
 
 namespace Asset::ShaderCompiler {
 
-auto compile_spirv(std::filesystem::path const& shader_path, std::string_view glsl_source, Graphics::ShaderStage stage) -> std::expected<std::vector<u8>, std::string>;
+auto compile_spirv(std::filesystem::path const& shader_path, std::string_view glsl_source, Graphics::ShaderStage stage) -> Common::Expected<std::vector<u8>>;
 
 }

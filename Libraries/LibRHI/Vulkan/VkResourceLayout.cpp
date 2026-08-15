@@ -7,12 +7,13 @@
 #include <cassert>
 #include <format>
 
+#include <Common/Expected.h>
 #include <LibRHI/Vulkan/VkResourceLayout.h>
 #include <LibRHI/Vulkan/VkShader.h>
 
 namespace RHI {
 
-auto VkResourceLayout::create(Configuration const& config, RHI::VkDevice const* device) -> std::expected<std::unique_ptr<VkResourceLayout>, std::string>
+auto VkResourceLayout::create(Configuration const& config, RHI::VkDevice const* device) -> Common::Expected<std::unique_ptr<VkResourceLayout>>
 {
     std::unique_ptr<VkResourceLayout> resource_layout(new VkResourceLayout(device));
 
@@ -33,7 +34,7 @@ auto VkResourceLayout::create(Configuration const& config, RHI::VkDevice const* 
     };
 
     if (auto result = vkCreateDescriptorSetLayout(device->handle(), &layout_create_info, nullptr, &resource_layout->m_handle); result != VK_SUCCESS) {
-        return std::unexpected(std::format("Failed to create descriptor set layout: {}", std::to_string(result)));
+        return OA_ERROR("Failed to create descriptor set layout: {}", std::to_string(result));
     }
 
     return resource_layout;

@@ -10,6 +10,7 @@
 #include <memory>
 #include <string>
 
+#include <Common/Expected.h>
 #include <Common/Noncopyable.h>
 #include <LibRHI/Buffer.h>
 
@@ -20,7 +21,7 @@ class MTLBuffer final : public Buffer {
     OA_MAKE_NONMOVABLE(MTLBuffer);
 
 public:
-    static auto create(Configuration const& config) -> std::expected<std::unique_ptr<MTLBuffer>, std::string>;
+    static auto create(Configuration const& config) -> Common::Expected<std::unique_ptr<MTLBuffer>>;
 
     ~MTLBuffer() override;
 

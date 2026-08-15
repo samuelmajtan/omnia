@@ -10,6 +10,7 @@
 #include <memory>
 #include <string>
 
+#include <Common/Expected.h>
 #include <LibRHI/RenderTarget.h>
 #include <LibRHI/Vulkan/VkDevice.h>
 
@@ -17,7 +18,7 @@ namespace RHI {
 
 class VkRenderTarget final : public RenderTarget {
 public:
-    static auto create(Configuration const& config, RHI::VkDevice const* device) -> std::expected<std::unique_ptr<VkRenderTarget>, std::string>;
+    static auto create(Configuration const& config, RHI::VkDevice const* device) -> Common::Expected<std::unique_ptr<VkRenderTarget>>;
     ~VkRenderTarget() override;
 
     auto framebuffer() const -> VkFramebuffer;

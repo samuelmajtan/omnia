@@ -10,6 +10,7 @@
 #include <memory>
 #include <string>
 
+#include <Common/Expected.h>
 #include <Common/Noncopyable.h>
 #include <LibRHI/Swapchain.h>
 #include <LibRHI/Vulkan/VkCommandBuffer.h>
@@ -20,7 +21,7 @@ namespace RHI {
 
 class VkSwapchain final : public Swapchain {
 public:
-    static auto create(Configuration const& config, RHI::VkDevice const* device) -> std::expected<std::unique_ptr<VkSwapchain>, std::string>;
+    static auto create(Configuration const& config, RHI::VkDevice const* device) -> Common::Expected<std::unique_ptr<VkSwapchain>>;
 
     ~VkSwapchain() override;
 
@@ -31,7 +32,7 @@ public:
     auto textures() const -> std::vector<std::unique_ptr<Texture>> const& override;
 
     auto is_dirty() const -> bool override;
-    auto recreate(Configuration const& config) -> std::expected<void, std::string> override;
+    auto recreate(Configuration const& config) -> Common::Expected<void> override;
     void wait_idle() const override;
     auto begin_frame() -> std::optional<Frame> override;
     void end_frame(Frame const& frame) override;
@@ -43,10 +44,10 @@ private:
     auto select_swap_extent() const -> VkExtent2D;
     auto select_image_count() const -> u32;
 
-    auto create_swapchain() -> std::expected<void, std::string>;
-    auto create_images() -> std::expected<void, std::string>;
-    auto create_command_buffers() -> std::expected<void, std::string>;
-    auto create_sync_objects() -> std::expected<void, std::string>;
+    auto create_swapchain() -> Common::Expected<void>;
+    auto create_images() -> Common::Expected<void>;
+    auto create_command_buffers() -> Common::Expected<void>;
+    auto create_sync_objects() -> Common::Expected<void>;
 private:
     Configuration m_config;
     bool m_is_dirty = false;

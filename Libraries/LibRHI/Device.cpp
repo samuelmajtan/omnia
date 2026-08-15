@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+#include <Common/Expected.h>
 #include <Common/Platform.h>
 #include <LibRHI/Device.h>
 #ifdef OA_OS_WINDOWS
@@ -17,7 +18,7 @@
 
 namespace RHI {
 
-auto Device::create(Configuration const& config) -> std::expected<std::unique_ptr<Device>, std::string>
+auto Device::create(Configuration const& config) -> Common::Expected<std::unique_ptr<Device>>
 {
     switch (config.api) {
 #ifdef OA_OS_WINDOWS
@@ -32,7 +33,7 @@ auto Device::create(Configuration const& config) -> std::expected<std::unique_pt
         return VkDevice::create(config);
 #endif
     default:
-        return std::unexpected("Unsupported graphics API selected.");
+        return OA_ERROR("Unsupported graphics API selected");
     }
 }
 

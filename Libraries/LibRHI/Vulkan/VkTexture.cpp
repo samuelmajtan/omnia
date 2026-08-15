@@ -7,12 +7,13 @@
 #include <cassert>
 #include <format>
 
+#include <Common/Expected.h>
 #include <LibRHI/Vulkan/VkStagingBuffer.h>
 #include <LibRHI/Vulkan/VkTexture.h>
 
 namespace RHI {
 
-auto VkTexture::create_owned(Configuration const& config, RHI::VkDevice const* device) -> std::expected<std::unique_ptr<VkTexture>, std::string>
+auto VkTexture::create_owned(Configuration const& config, RHI::VkDevice const* device) -> Common::Expected<std::unique_ptr<VkTexture>>
 {
     std::unique_ptr<VkTexture> texture(new VkTexture(config, device));
     texture->m_owned = true;
@@ -50,7 +51,7 @@ auto VkTexture::create_owned(Configuration const& config, RHI::VkDevice const* d
     };
 
     if (auto result = vmaCreateImage(device->allocator(), &image_create_info, &allocation_create_info, &texture->m_image, &texture->m_allocation, nullptr); result != VK_SUCCESS) {
-        return std::unexpected(std::format("Failed to create Vulkan image: {}", string_VkResult(result)));
+        return OA_ERROR("Failed to create Vulkan image: {}", string_VkResult(result));
     }
 
     VkImageViewCreateInfo const image_view_create_info {
@@ -68,15 +69,13 @@ auto VkTexture::create_owned(Configuration const& config, RHI::VkDevice const* d
         .subresourceRange = { .aspectMask = to_vk_aspect(config.format), .baseMipLevel = 0, .levelCount = 1, .baseArrayLayer = 0, .layerCount = 1 }
     };
     if (auto result = vkCreateImageView(device->handle(), &image_view_create_info, nullptr, &texture->m_image_view); result != VK_SUCCESS) {
-        return std::unexpected(std::format("Failed to create Vulkan image view: {}", string_VkResult(result)));
+        return OA_ERROR("Failed to create Vulkan image view: {}", string_VkResult(result));
     }
 
     if (!config.data.empty()) {
-        auto staging_buffer = VkStagingBuffer::create(device, config.data.size());
-        if (!staging_buffer) {
-            return std::unexpected(staging_buffer.error());
-        }
-        std::memcpy(staging_buffer->allocation_info().pMappedData, config.data.data(), config.data.size());
+        VkStagingBuffer staging_buffer;
+        TRY_ASSIGN(staging_buffer, VkStagingBuffer::create(device, config.data.size()));
+        std::memcpy(staging_buffer.allocation_info().pMappedData, config.data.data(), config.data.size());
 
         VkBufferImageCopy const copy_region {
             .bufferOffset = 0,
@@ -94,7 +93,7 @@ auto VkTexture::create_owned(Configuration const& config, RHI::VkDevice const* d
         auto& cmd = device->graphics_command_buffer();
         cmd.begin(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
         cmd.transition_image_layout(texture->m_image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-        vkCmdCopyBufferToImage(cmd.handle(), staging_buffer->handle(), texture->m_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy_region);
+        vkCmdCopyBufferToImage(cmd.handle(), staging_buffer.handle(), texture->m_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy_region);
         cmd.transition_image_layout(texture->m_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         device->submit_graphics(cmd);
     }
@@ -102,7 +101,7 @@ auto VkTexture::create_owned(Configuration const& config, RHI::VkDevice const* d
     return texture;
 }
 
-auto VkTexture::create_borrowed(Configuration const& config, const RHI::VkDevice* device, VkImage image, VkImageView image_view) -> std::expected<std::unique_ptr<VkTexture>, std::string>
+auto VkTexture::create_borrowed(Configuration const& config, const RHI::VkDevice* device, VkImage image, VkImageView image_view) -> Common::Expected<std::unique_ptr<VkTexture>>
 {
     std::unique_ptr<VkTexture> texture(new VkTexture(config, device));
     texture->m_image = image;

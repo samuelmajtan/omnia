@@ -4,11 +4,12 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+#include <Common/Expected.h>
 #include <LibRenderer/Model.h>
 
 namespace Renderer {
 
-auto Model::create(Configuration const& configuration, RHI::Device* device) -> std::expected<std::unique_ptr<Model>, std::string>
+auto Model::create(Configuration const& configuration, RHI::Device* device) -> Common::Expected<std::unique_ptr<Model>>
 {
     assert(device != nullptr);
 
@@ -22,7 +23,7 @@ auto Model::create(Configuration const& configuration, RHI::Device* device) -> s
         });
 }
 
-auto Model::create_sub_meshes(std::vector<SubMesh::Configuration> const& configurations, RHI::Device const* device) -> std::expected<void, std::string>
+auto Model::create_sub_meshes(std::vector<SubMesh::Configuration> const& configurations, RHI::Device const* device) -> Common::Expected<void>
 {
     m_sub_meshes.reserve(configurations.size());
     for (auto const& sub_mesh_configuration : configurations) {
@@ -35,7 +36,7 @@ auto Model::create_sub_meshes(std::vector<SubMesh::Configuration> const& configu
     return {};
 }
 
-auto Model::create_materials(std::vector<Material::Configuration> const& configurations, RHI::Device* device) -> std::expected<void, std::string>
+auto Model::create_materials(std::vector<Material::Configuration> const& configurations, RHI::Device* device) -> Common::Expected<void>
 {
     m_materials.reserve(configurations.size());
     for (auto const& material_configuration : configurations) {

@@ -10,6 +10,7 @@
 #include <memory>
 #include <string>
 
+#include <Common/Expected.h>
 #include <Common/Types.h>
 #include <LibRHI/Device.h>
 #include <LibRenderer/Export.h>
@@ -38,19 +39,19 @@ public:
         ResourceManager* resource_manager {};
     };
 
-    static auto create(Configuration const& config) -> std::expected<std::unique_ptr<DeferredRenderer>, std::string>;
+    static auto create(Configuration const& config) -> Common::Expected<std::unique_ptr<DeferredRenderer>>;
 
     void submit(SubmitInfo const& submit_info) const override;
-    auto resize(u32 width, u32 height) -> std::expected<void, std::string> override;
+    auto resize(u32 width, u32 height) -> Common::Expected<void> override;
 
-    auto create_output_render_target(RHI::Texture const* output_texture) const -> std::expected<std::unique_ptr<RHI::RenderTarget>, std::string> override;
+    auto create_output_render_target(RHI::Texture const* output_texture) const -> Common::Expected<std::unique_ptr<RHI::RenderTarget>> override;
 private:
     explicit DeferredRenderer(Configuration const& config);
 
-    auto create_gbuffer_textures(u32 width, u32 height) -> std::expected<GBuffer, std::string>;
-    auto create_resources(Configuration const& config) -> std::expected<void, std::string>;
-    auto create_passes(Configuration const& config) -> std::expected<void, std::string>;
-    auto create_pipelines(Configuration const& config) -> std::expected<void, std::string>;
+    auto create_gbuffer_textures(u32 width, u32 height) -> Common::Expected<GBuffer>;
+    auto create_resources(Configuration const& config) -> Common::Expected<void>;
+    auto create_passes(Configuration const& config) -> Common::Expected<void>;
+    auto create_pipelines(Configuration const& config) -> Common::Expected<void>;
 private:
     // --- Lighting pass --- //
     std::unique_ptr<RHI::RenderPass> m_shadow_render_pass;

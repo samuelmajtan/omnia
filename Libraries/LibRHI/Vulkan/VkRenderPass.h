@@ -10,6 +10,7 @@
 #include <memory>
 #include <string>
 
+#include <Common/Expected.h>
 #include <LibRHI/RenderPass.h>
 #include <LibRHI/Vulkan/VkCommon.h>
 #include <LibRHI/Vulkan/VkDevice.h>
@@ -18,7 +19,7 @@ namespace RHI {
 
 class VkRenderPass final : public RenderPass {
 public:
-    static auto create(Configuration const& config, RHI::VkDevice const* device) -> std::expected<std::unique_ptr<RHI::VkRenderPass>, std::string>;
+    static auto create(Configuration const& config, RHI::VkDevice const* device) -> Common::Expected<std::unique_ptr<RHI::VkRenderPass>>;
 
     ~VkRenderPass() override;
 
@@ -29,7 +30,7 @@ public:
 private:
     VkRenderPass(Configuration const& config, RHI::VkDevice const* device);
 
-    auto create_render_pass() -> std::expected<void, std::string>;
+    auto create_render_pass() -> Common::Expected<void>;
 private:
     Configuration m_config {};
     ::VkRenderPass m_handle {};

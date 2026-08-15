@@ -10,6 +10,7 @@
 #include <memory>
 #include <string>
 
+#include <Common/Expected.h>
 #include <Common/Noncopyable.h>
 #include <LibRHI/Swapchain.h>
 
@@ -20,7 +21,7 @@ class DX12Swapchain final : public Swapchain {
     OA_MAKE_NONMOVABLE(DX12Swapchain);
 
 public:
-    static auto create(Configuration const& config) -> std::expected<std::unique_ptr<DX12Swapchain>, std::string>;
+    static auto create(Configuration const& config) -> Common::Expected<std::unique_ptr<DX12Swapchain>>;
 
     ~DX12Swapchain() override;
 
@@ -31,7 +32,7 @@ public:
     auto textures() const -> std::vector<std::unique_ptr<Texture>> const& override;
 
     auto is_dirty() const -> bool override;
-    auto recreate(Configuration const& config) -> std::expected<void, std::string> override;
+    auto recreate(Configuration const& config) -> Common::Expected<void> override;
     void wait_idle() const override;
     auto begin_frame() -> std::optional<Frame> override;
     void end_frame(Frame const& frame) override;

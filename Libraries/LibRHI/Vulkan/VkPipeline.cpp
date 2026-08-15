@@ -8,6 +8,7 @@
 #include <cassert>
 #include <format>
 
+#include <Common/Expected.h>
 #include <LibRHI/Vulkan/VkDevice.h>
 #include <LibRHI/Vulkan/VkPipeline.h>
 #include <LibRHI/Vulkan/VkRenderPass.h>
@@ -16,7 +17,7 @@
 
 namespace RHI {
 
-auto VkPipeline::create(Configuration const& config, RHI::VkDevice const* device) -> std::expected<std::unique_ptr<VkPipeline>, std::string>
+auto VkPipeline::create(Configuration const& config, RHI::VkDevice const* device) -> Common::Expected<std::unique_ptr<VkPipeline>>
 {
     std::unique_ptr<VkPipeline> pipeline(new VkPipeline(config, device));
 
@@ -178,7 +179,7 @@ auto VkPipeline::create(Configuration const& config, RHI::VkDevice const* device
     }
 
     if (auto result = vkCreatePipelineLayout(device->handle(), &pipeline_layout_create_info, nullptr, &pipeline->m_layout); result != VK_SUCCESS) {
-        return std::unexpected(std::format("Failed to create vulkan pipeline layout: {}", string_VkResult(result)));
+        return OA_ERROR("Failed to create vulkan pipeline layout: {}", string_VkResult(result));
     }
 
     std::array<VkDynamicState, 2> const dynamic_states = {
@@ -232,7 +233,7 @@ auto VkPipeline::create(Configuration const& config, RHI::VkDevice const* device
     };
 
     if (auto result = vkCreateGraphicsPipelines(device->handle(), VK_NULL_HANDLE, 1, &pipeline_create_info, nullptr, &pipeline->m_handle); result != VK_SUCCESS) {
-        return std::unexpected(std::format("Failed to create vulkan graphics pipeline: {}", string_VkResult(result)));
+        return OA_ERROR("Failed to create vulkan graphics pipeline: {}", string_VkResult(result));
     }
 
     return pipeline;

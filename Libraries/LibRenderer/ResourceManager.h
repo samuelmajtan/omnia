@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <Common/Expected.h>
 #include <LibAsset/AssetManager.h>
 #include <LibRHI/Device.h>
 #include <LibRenderer/Export.h>
@@ -16,27 +17,27 @@ namespace Renderer {
 class RENDERER_API ResourceManager final {
 public:
     struct DefaultResource {
-        static constexpr auto albedo_texture_id = Asset::AssetID(1);
-        static constexpr auto normal_texture_id = Asset::AssetID(2);
-        static constexpr auto metallic_roughness_texture_id = Asset::AssetID(3);
-        static constexpr auto occlusion_texture_id = Asset::AssetID(4);
-        static constexpr auto emissive_texture_id = Asset::AssetID(5);
+        static constexpr auto ALBEDO_TEXTURE_ID = Asset::AssetID(1);
+        static constexpr auto NORMAL_TEXTURE_ID = Asset::AssetID(2);
+        static constexpr auto METALLIC_ROUGHNESS_TEXTURE_ID = Asset::AssetID(3);
+        static constexpr auto OCCLUSION_TEXTURE_ID = Asset::AssetID(4);
+        static constexpr auto EMISSIVE_TEXTURE_ID = Asset::AssetID(5);
     };
 
-    static auto create(Asset::AssetManager const* asset_manager, RHI::Device* device) -> std::expected<std::unique_ptr<ResourceManager>, std::string>;
+    static auto create(Asset::AssetManager const* asset_manager, RHI::Device* device) -> Common::Expected<std::unique_ptr<ResourceManager>>;
 
     auto resource_layout() const -> RHI::ResourceLayout const*;
-    auto load_model(std::string const& asset_name) -> std::expected<Model const*, std::string>;
-    auto load_model(Asset::AssetID asset_id) -> std::expected<Model const*, std::string>;
+    auto load_model(std::string const& asset_name) -> Common::Expected<Model const*>;
+    auto load_model(Asset::AssetID asset_id) -> Common::Expected<Model const*>;
 
-    auto load_shader(std::string const& asset_name) -> std::expected<RHI::Shader const*, std::string>;
-    auto load_shader(Asset::AssetID asset_id) -> std::expected<RHI::Shader const*, std::string>;
+    auto load_shader(std::string const& asset_name) -> Common::Expected<RHI::Shader const*>;
+    auto load_shader(Asset::AssetID asset_id) -> Common::Expected<RHI::Shader const*>;
 
-    auto load_texture(std::string const& asset_name, RHI::TextureFormat format = RHI::TextureFormat::R8G8B8A8_UNORM) -> std::expected<RHI::Texture const*, std::string>;
-    auto load_texture(Asset::AssetID asset_id, RHI::TextureFormat format = RHI::TextureFormat::R8G8B8A8_UNORM) -> std::expected<RHI::Texture const*, std::string>;
+    auto load_texture(std::string const& asset_name, RHI::TextureFormat format = RHI::TextureFormat::R8G8B8A8_UNORM) -> Common::Expected<RHI::Texture const*>;
+    auto load_texture(Asset::AssetID asset_id, RHI::TextureFormat format = RHI::TextureFormat::R8G8B8A8_UNORM) -> Common::Expected<RHI::Texture const*>;
 private:
     ResourceManager() = default;
-    auto initialize_default_resources() -> std::expected<void, std::string>;
+    auto initialize_default_resources() -> Common::Expected<void>;
 private:
     RHI::Device* m_device {};
     Asset::AssetManager const* m_asset_manager {};

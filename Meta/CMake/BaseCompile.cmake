@@ -23,3 +23,9 @@ endif()
 if (WIN32)
     add_compile_definitions(-DWIN32_LEAN_AND_MEAN -DNOMINMAX)
 endif()
+
+add_compile_definitions(
+    $<$<CONFIG:Debug>:OA_BUILD_DEBUG>
+    $<$<CONFIG:Release>:OA_BUILD_DISTRIBUTION>
+    $<$<CONFIG:RelWithDebInfo>:OA_BUILD_RELWITHDEBINFO>
+)

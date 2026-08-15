@@ -23,12 +23,12 @@ using SteadyClock = std::chrono::steady_clock;
 
 struct Timestamp final {
     i32 year {};
-    i32 month {};
-    i32 day {};
+    u32 month {};
+    u32 day {};
     i32 hour {};
     i32 minute {};
-    i32 second {};
-    i32 millisecond {};
+    i64 second {};
+    i64 millisecond {};
 };
 
 inline constexpr auto now() -> TimePoint
@@ -38,24 +38,23 @@ inline constexpr auto now() -> TimePoint
 
 inline auto to_local(TimePoint time_point) -> Timestamp
 {
-    std::time_t time = Clock::to_time_t(time_point);
-    std::tm local_tm {};
-#if defined(OA_OS_WINDOWS)
-    localtime_s(&local_tm, &time);
-#else
-    localtime_r(&time, &local_tm);
-#endif
-
-    auto const milliseconds = static_cast<i32>(std::chrono::duration_cast<std::chrono::milliseconds>(time_point.time_since_epoch()).count() % 1000);
+    auto const local = std::chrono::current_zone()->to_local(time_point);
+    auto const day = std::chrono::floor<std::chrono::days>(local);
+    auto const time = local - day;
+    auto const ymd = std::chrono::year_month_day(day);
+    auto const hours = std::chrono::duration_cast<std::chrono::hours>(time);
+    auto const minutes = std::chrono::duration_cast<std::chrono::minutes>(time - hours);
+    auto const seconds = std::chrono::duration_cast<std::chrono::seconds>(time - hours - minutes);
+    auto const milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(time - hours - minutes - seconds);
 
     return Timestamp {
-        .year = local_tm.tm_year + 1900,
-        .month = local_tm.tm_mon + 1,
-        .day = local_tm.tm_mday,
-        .hour = local_tm.tm_hour,
-        .minute = local_tm.tm_min,
-        .second = local_tm.tm_sec,
-        .millisecond = milliseconds
+        .year = i32(ymd.year()),
+        .month = u32(ymd.month()),
+        .day = u32(ymd.day()),
+        .hour = hours.count(),
+        .minute = minutes.count(),
+        .second = seconds.count(),
+        .millisecond = milliseconds.count()
     };
 }
 

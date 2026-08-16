@@ -63,12 +63,13 @@ public:
     }
 
 private:
-    auto context_for(AssetEntry const& entry, std::filesystem::path const& path) const -> ImportContext
+    auto context_for(AssetEntry const& entry, LooseAssetEntry const& source) const -> ImportContext
     {
         return ImportContext {
-            .path = path,
+            .path = source.path,
             .registry = &m_asset_registry,
-            .sidecar = &entry.sidecar
+            .sidecar = &entry.sidecar,
+            .sub_asset = source.sub_asset
         };
     }
 
@@ -80,7 +81,7 @@ private:
             return OA_ERROR("Packed assets are not supported yet");
         }
 
-        auto const context = context_for(entry, source->path);
+        auto const context = context_for(entry, *source);
 
         auto hash = TRY(AssetTraits<T>::source_hash(context));
         auto const source_hash = entry.sidecar.hash_settings(hash);

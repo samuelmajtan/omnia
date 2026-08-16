@@ -200,3 +200,103 @@ TEST_F(Registry, MissingRootIsAnError)
     Asset::AssetRegistry registry(m_root / "does-not-exist");
     EXPECT_FALSE(registry.scan().has_value());
 }
+
+TEST_F(Registry, SubAssetKeyJoinsWithTheSeparator)
+{
+    EXPECT_EQ(Asset::AssetRegistry::sub_asset_key("Models/CesiumMan/CesiumMan", "walk"), "Models/CesiumMan/CesiumMan#walk");
+}
+
+TEST_F(Registry, RegisterSubAssetDerivesAStableID)
+{
+    add_file("Models/CesiumMan.gltf");
+
+    Asset::AssetRegistry registry(m_root);
+    ASSERT_TRUE(registry.scan().has_value());
+
+    auto const parent = registry.resolve(registry.key_to_id("Models/CesiumMan").value());
+    ASSERT_TRUE(parent.has_value()) << parent.error();
+
+    ASSERT_TRUE(registry.register_sub_asset(parent.value(), { .name = "walk", .type = Asset::AssetType::Model }).has_value());
+
+    auto const id = registry.key_to_id("Models/CesiumMan#walk");
+    ASSERT_TRUE(id.has_value());
+    EXPECT_EQ(id.value(), Common::UUID::derive(parent.value().id(), "walk"));
+    EXPECT_NE(id.value(), parent.value().id());
+}
+
+TEST_F(Registry, SubAssetKeepsTheParentSourcePathAndRemembersItsName)
+{
+    add_file("Models/CesiumMan.gltf");
+
+    Asset::AssetRegistry registry(m_root);
+    ASSERT_TRUE(registry.scan().has_value());
+
+    auto const parent = registry.resolve(registry.key_to_id("Models/CesiumMan").value()).value();
+    ASSERT_TRUE(registry.register_sub_asset(parent, { .name = "walk", .type = Asset::AssetType::Model }).has_value());
+
+    auto const entry = registry.resolve(registry.key_to_id("Models/CesiumMan#walk").value());
+    ASSERT_TRUE(entry.has_value()) << entry.error();
+
+    auto const& source = std::get<Asset::LooseAssetEntry>(entry.value().source);
+    EXPECT_EQ(source.path, std::get<Asset::LooseAssetEntry>(parent.source).path);
+    ASSERT_TRUE(entry.value().sub_asset_name().has_value());
+    EXPECT_EQ(entry.value().sub_asset_name().value(), "walk");
+    EXPECT_FALSE(parent.sub_asset_name().has_value());
+}
+
+TEST_F(Registry, SubAssetIDsAreStableAcrossScans)
+{
+    add_file("Models/CesiumMan.gltf");
+
+    Asset::AssetRegistry first(m_root);
+    ASSERT_TRUE(first.scan().has_value());
+    auto const first_parent = first.resolve(first.key_to_id("Models/CesiumMan").value()).value();
+    ASSERT_TRUE(first.register_sub_asset(first_parent, { .name = "walk", .type = Asset::AssetType::Model }).has_value());
+
+    Asset::AssetRegistry second(m_root);
+    ASSERT_TRUE(second.scan().has_value());
+    auto const second_parent = second.resolve(second.key_to_id("Models/CesiumMan").value()).value();
+    ASSERT_TRUE(second.register_sub_asset(second_parent, { .name = "walk", .type = Asset::AssetType::Model }).has_value());
+
+    EXPECT_EQ(first.key_to_id("Models/CesiumMan#walk"), second.key_to_id("Models/CesiumMan#walk"));
+}
+
+TEST_F(Registry, RegisterSubAssetRejectsBadNames)
+{
+    add_file("Models/CesiumMan.gltf");
+
+    Asset::AssetRegistry registry(m_root);
+    ASSERT_TRUE(registry.scan().has_value());
+    auto const parent = registry.resolve(registry.key_to_id("Models/CesiumMan").value()).value();
+
+    EXPECT_FALSE(registry.register_sub_asset(parent, { .name = "", .type = Asset::AssetType::Model }).has_value());
+    EXPECT_FALSE(registry.register_sub_asset(parent, { .name = "walk#run", .type = Asset::AssetType::Model }).has_value());
+    EXPECT_EQ(registry.entries().size(), 1U);
+}
+
+TEST_F(Registry, SubAssetsCannotNest)
+{
+    add_file("Models/CesiumMan.gltf");
+
+    Asset::AssetRegistry registry(m_root);
+    ASSERT_TRUE(registry.scan().has_value());
+
+    auto const parent = registry.resolve(registry.key_to_id("Models/CesiumMan").value()).value();
+    ASSERT_TRUE(registry.register_sub_asset(parent, { .name = "walk", .type = Asset::AssetType::Model }).has_value());
+
+    auto const sub = registry.resolve(registry.key_to_id("Models/CesiumMan#walk").value()).value();
+    EXPECT_FALSE(registry.register_sub_asset(sub, { .name = "faster", .type = Asset::AssetType::Model }).has_value());
+}
+
+TEST_F(Registry, DuplicateSubAssetIsRejected)
+{
+    add_file("Models/CesiumMan.gltf");
+
+    Asset::AssetRegistry registry(m_root);
+    ASSERT_TRUE(registry.scan().has_value());
+    auto const parent = registry.resolve(registry.key_to_id("Models/CesiumMan").value()).value();
+
+    ASSERT_TRUE(registry.register_sub_asset(parent, { .name = "walk", .type = Asset::AssetType::Model }).has_value());
+    EXPECT_FALSE(registry.register_sub_asset(parent, { .name = "walk", .type = Asset::AssetType::Model }).has_value());
+    EXPECT_EQ(registry.entries().size(), 2U);
+}

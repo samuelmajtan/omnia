@@ -88,6 +88,33 @@ auto AssetRegistry::register_asset(AssetEntry const& entry) -> Common::Expected<
     return {};
 }
 
+auto AssetRegistry::register_sub_asset(AssetEntry const& parent, SubAssetDescriptor const& descriptor) -> Common::Expected<void>
+{
+    if (descriptor.name.empty()) {
+        return OA_ERROR("Sub-asset of '{}' has an empty name", parent.key);
+    }
+    if (descriptor.name.contains(SUB_ASSET_SEPARATOR)) {
+        return OA_ERROR("Sub-asset name '{}' of '{}' contains the reserved '{}' separator", descriptor.name, parent.key, SUB_ASSET_SEPARATOR);
+    }
+
+    auto const* source = std::get_if<LooseAssetEntry>(&parent.source);
+    if (source == nullptr) {
+        return OA_ERROR("Cannot derive sub-asset '{}': packed assets are not supported yet", descriptor.name);
+    }
+    if (source->sub_asset.has_value()) {
+        return OA_ERROR("Cannot derive sub-asset '{}' from '{}', which is itself a sub-asset", descriptor.name, parent.key);
+    }
+
+    AssetEntry const entry {
+        .sidecar = AssetSidecar(Common::UUID::derive(parent.id(), descriptor.name), descriptor.type),
+        .key = sub_asset_key(parent.key, descriptor.name),
+        .source = LooseAssetEntry { .path = source->path, .sub_asset = descriptor.name }
+    };
+
+    OA_LOG_TRACE(Log::Registry, "{} -> {} ({})", entry.key, entry.id(), to_string(entry.type()));
+    return register_asset(entry);
+}
+
 auto AssetRegistry::key_to_id(std::string const& key) const -> std::optional<AssetID>
 {
     auto const it = m_assets_by_key.find(key);
@@ -118,6 +145,11 @@ auto AssetRegistry::resolve_key(std::filesystem::path path) const -> std::string
     path = std::filesystem::relative(path, m_root_directory);
     path.replace_extension("");
     return path.generic_string();
+}
+
+auto AssetRegistry::sub_asset_key(std::string const& parent_key, std::string const& sub_asset_name) -> std::string
+{
+    return std::format("{}{}{}", parent_key, SUB_ASSET_SEPARATOR, sub_asset_name);
 }
 
 auto AssetRegistry::entries() const -> std::unordered_map<std::string, AssetEntry> const&

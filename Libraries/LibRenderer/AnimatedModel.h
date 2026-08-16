@@ -44,6 +44,7 @@ public:
     void update(f32 delta_seconds, u32 frame_index);
 
     auto model() const -> Model const*;
+    auto is_looping() const -> bool;
     auto animations() const -> std::vector<Asset::AnimationClip> const&;
     auto find_animation(std::string_view name) const -> Asset::AnimationClip const*;
     auto player() const -> Asset::AnimationPlayer const&;

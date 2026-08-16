@@ -96,6 +96,11 @@ auto AnimatedModel::model() const -> Model const*
     return m_model;
 }
 
+auto AnimatedModel::is_looping() const -> bool
+{
+    return m_player.is_looping();
+}
+
 auto AnimatedModel::animations() const -> std::vector<Asset::AnimationClip> const&
 {
     return m_animations;

@@ -93,6 +93,7 @@ public:
 
         sandbox->m_window->event_dispatcher().register_listener<Platform::MouseDeltaEvent>(std::bind_front(&Sandbox::on_mouse_delta, sandbox.get()));
         sandbox->m_window->event_dispatcher().register_listener<Platform::WindowResizeEvent>(std::bind_front(&Sandbox::on_resize, sandbox.get()));
+        sandbox->m_window->event_dispatcher().register_listener<Platform::KeyEvent>(std::bind_front(&Sandbox::on_key_event, sandbox.get()));
 
         OA_LOG_INFO(Log, "Startup complete in {:.1f}ms", stopwatch.elapsed_milliseconds());
         return sandbox;
@@ -125,6 +126,20 @@ public:
             .model_matrix = Math::Mat4f::translation(0.0F, 100.0F, -15.0F) * Math::Mat4f::scale(10.0F, 10.0F, 10.0F),
             .bone_resource_set = nullptr
         });
+    }
+
+    auto on_key_event(Platform::KeyEvent const& event) -> bool
+    {
+        if (!event.is_pressed) {
+            return false;
+        }
+
+        if (event.key == Platform::Key::F) {
+            auto _ = m_character->play(CHARACTER_CLIP_NAME);
+        } else if (event.key == Platform::Key::G) {
+            m_character->stop();
+        }
+        return false;
     }
 
     auto on_mouse_delta(Platform::MouseDeltaEvent const& event) -> bool

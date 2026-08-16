@@ -46,22 +46,11 @@ public:
     auto load_packed_assets() -> Common::Expected<void>;
 
     template<AssetData T>
-    auto import(std::string const& key) const -> Common::Expected<T>
-    {
-        auto id = m_asset_registry.key_to_id(key);
-        if (!id) {
-            return OA_ERROR("Asset with key '{}' not found", key);
-        }
-        return import <T>(id.value());
-    }
-
-    template<AssetData T>
     auto import(AssetID id) const -> Common::Expected<T>
     {
         auto entry = TRY(m_asset_registry.resolve(id));
         return import_entry<T>(entry, false);
     }
-
 private:
     auto context_for(AssetEntry const& entry, LooseAssetEntry const& source) const -> ImportContext
     {

@@ -22,6 +22,8 @@
 
 namespace Asset {
 
+inline constexpr char SUB_ASSET_SEPARATOR = '#';
+
 struct LooseAssetEntry {
     std::filesystem::path path;
     std::optional<std::string> sub_asset = std::nullopt;
@@ -52,15 +54,28 @@ struct AssetEntry {
         auto const* loose = std::get_if<LooseAssetEntry>(&source);
         return loose != nullptr ? loose->sub_asset : std::nullopt;
     }
+
+    auto display_name() const -> std::string
+    {
+        auto const* loose = std::get_if<LooseAssetEntry>(&source);
+        if (loose == nullptr) {
+            return key;
+        }
+
+        auto name = sidecar.setting(AssetSidecar::NAME_SETTING).value_or(loose->path.stem().string());
+        if (loose->sub_asset.has_value()) {
+            return std::format("{}{}{}", name, SUB_ASSET_SEPARATOR, loose->sub_asset.value());
+        }
+        return name;
+    }
 };
 
 class ASSET_API AssetRegistry final {
     OA_MAKE_DEFAULT_CONSTRUCTIBLE(AssetRegistry);
 
 public:
-    static constexpr char SUB_ASSET_SEPARATOR = '#';
-
     explicit AssetRegistry(std::filesystem::path const& root_directory);
+
 
     auto scan() -> Common::Expected<void>;
 
@@ -68,14 +83,13 @@ public:
     auto register_sub_asset(AssetEntry const& parent, SubAssetDescriptor const& descriptor) -> Common::Expected<void>;
     auto key_to_id(std::string const& key) const -> std::optional<AssetID>;
     auto resolve(AssetID id) const -> Common::Expected<AssetEntry>;
+    auto resolve_sub_asset_key(std::string const& parent_key, std::string const& sub_asset_name) -> std::string;
     auto resolve_key(std::filesystem::path path) const -> std::string;
-    static auto sub_asset_key(std::string const& parent_key, std::string const& sub_asset_name) -> std::string;
-
-    auto entries() const -> std::unordered_map<std::string, AssetEntry> const&;
+    auto entries() const -> std::unordered_map<AssetID, AssetEntry> const&;
 private:
     std::filesystem::path m_root_directory;
-    std::unordered_map<std::string, AssetEntry> m_assets_by_key;
-    std::unordered_map<AssetID, std::string> m_keys_by_id;
+    std::unordered_map<AssetID, AssetEntry> m_assets_by_id;
+    std::unordered_map<std::string, AssetID> m_ids_by_key;
 };
 
 }

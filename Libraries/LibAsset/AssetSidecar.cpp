@@ -140,6 +140,9 @@ auto AssetSidecar::hash_settings(u64 seed) const -> u64
     std::vector<std::string> keys;
     keys.reserve(m_settings.size());
     for (auto const& [key, value] : m_settings) {
+        if (key == NAME_SETTING) {
+            continue;
+        }
         keys.push_back(key);
     }
     std::ranges::sort(keys);

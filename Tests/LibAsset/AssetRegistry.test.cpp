@@ -106,8 +106,9 @@ TEST_F(Registry, AssetIDsAreStableAcrossScans)
     ASSERT_TRUE(second.scan().has_value());
 
     ASSERT_EQ(first.entries().size(), 2U);
-    for (auto const& [key, entry] : first.entries()) {
-        EXPECT_EQ(second.key_to_id(key), entry.id()) << "key " << key;
+    for (auto const& [id, entry] : first.entries()) {
+        EXPECT_EQ(id, first.key_to_id(entry.key));
+        EXPECT_EQ(id, second.key_to_id(entry.key));
     }
 }
 
@@ -162,21 +163,6 @@ TEST_F(Registry, ResolveUnknownIDFails)
     EXPECT_FALSE(registry.resolve(Common::UUID::generate()).has_value());
 }
 
-TEST_F(Registry, DuplicateKeyIsReportedAsAWarning)
-{
-    add_file("Textures/Error.png");
-    add_file("Textures/Error.jpg");
-
-    Asset::AssetRegistry registry(m_root);
-    ASSERT_TRUE(registry.scan().has_value());
-
-    EXPECT_EQ(registry.entries().size(), 1U);
-
-    auto const logged = captured_warnings();
-    EXPECT_NE(logged.find("Textures/Error"), std::string::npos);
-    EXPECT_NE(logged.find("WARN"), std::string::npos);
-}
-
 TEST_F(Registry, CleanScanHasNoWarnings)
 {
     add_file("Textures/Error.png");
@@ -203,7 +189,8 @@ TEST_F(Registry, MissingRootIsAnError)
 
 TEST_F(Registry, SubAssetKeyJoinsWithTheSeparator)
 {
-    EXPECT_EQ(Asset::AssetRegistry::sub_asset_key("Models/CesiumMan/CesiumMan", "walk"), "Models/CesiumMan/CesiumMan#walk");
+    Asset::AssetRegistry registry;
+    EXPECT_EQ(registry.resolve_sub_asset_key("Models/CesiumMan/CesiumMan", "walk"), "Models/CesiumMan/CesiumMan#walk");
 }
 
 TEST_F(Registry, RegisterSubAssetDerivesAStableID)
@@ -299,4 +286,99 @@ TEST_F(Registry, DuplicateSubAssetIsRejected)
     ASSERT_TRUE(registry.register_sub_asset(parent, { .name = "walk", .type = Asset::AssetType::Model }).has_value());
     EXPECT_FALSE(registry.register_sub_asset(parent, { .name = "walk", .type = Asset::AssetType::Model }).has_value());
     EXPECT_EQ(registry.entries().size(), 2U);
+}
+
+TEST_F(Registry, DisplayNameFallsBackToTheFileStem)
+{
+    add_file("Models/CesiumMan/CesiumMan.gltf");
+    add_file("Shaders/GeometryPass.vs.glsl");
+
+    Asset::AssetRegistry registry(m_root);
+    ASSERT_TRUE(registry.scan().has_value());
+
+    auto entry1 = registry.resolve(registry.key_to_id("Models/CesiumMan/CesiumMan").value());
+    ASSERT_TRUE(entry1.has_value()) << entry1.error();
+    auto entry2 = registry.resolve(registry.key_to_id("Shaders/GeometryPass.vs").value());
+    ASSERT_TRUE(entry2.has_value()) << entry2.error();
+
+    EXPECT_EQ(entry1->display_name(), "CesiumMan");
+    EXPECT_EQ(entry2->display_name(), "GeometryPass.vs");
+}
+
+TEST_F(Registry, SidecarNameOverridesTheDisplayName)
+{
+    add_file("Models/stormtrooper/scene.gltf");
+    Asset::AssetRegistry probe(m_root);
+    ASSERT_TRUE(probe.scan().has_value());
+
+    auto const sidecar_path = m_root / "Models/stormtrooper/scene.gltf.omnia";
+    auto const existing = File::read_all(sidecar_path);
+    ASSERT_TRUE(existing.has_value());
+    ASSERT_TRUE(File::write_all(sidecar_path, existing.value() + "name = Stormtrooper\n").has_value());
+
+    Asset::AssetRegistry registry(m_root);
+    ASSERT_TRUE(registry.scan().has_value());
+
+    auto entry = registry.resolve(registry.key_to_id("Models/stormtrooper/scene").value());
+    ASSERT_TRUE(entry.has_value()) << entry.error();
+    EXPECT_EQ(entry->display_name(), "Stormtrooper");
+    EXPECT_TRUE(registry.key_to_id("Models/stormtrooper/scene").has_value());
+}
+
+TEST_F(Registry, SubAssetDisplayNameHangsOffTheParent)
+{
+    add_file("Models/CesiumMan.gltf");
+
+    Asset::AssetRegistry registry(m_root);
+    ASSERT_TRUE(registry.scan().has_value());
+    auto const parent = registry.resolve(registry.key_to_id("Models/CesiumMan").value()).value();
+    ASSERT_TRUE(registry.register_sub_asset(parent, { .name = "walk", .type = Asset::AssetType::Model }).has_value());
+
+    auto entry = registry.resolve(registry.key_to_id("Models/CesiumMan#walk").value());
+    ASSERT_TRUE(entry.has_value()) << entry.error();
+    EXPECT_EQ(entry->display_name(), "CesiumMan#walk");
+    EXPECT_TRUE(registry.key_to_id("Models/CesiumMan#walk").has_value());
+}
+
+TEST_F(Registry, RenamingAnAssetDoesNotChangeItsSourceHash)
+{
+    Asset::AssetSidecar plain(Common::UUID::generate(), Asset::AssetType::Model);
+
+    auto renamed = plain;
+    renamed.set_setting(std::string(Asset::AssetSidecar::NAME_SETTING), "Stormtrooper");
+
+    auto tweaked = plain;
+    tweaked.set_setting("srgb", "true");
+
+    EXPECT_EQ(plain.hash_settings(1234), renamed.hash_settings(1234));
+    EXPECT_NE(plain.hash_settings(1234), tweaked.hash_settings(1234));
+}
+
+TEST_F(Registry, DisplayNameStaysShortEvenWhenItIsNotUnique)
+{
+    add_file("A/Model/scene.gltf");
+    add_file("B/Model/scene.gltf");
+
+    Asset::AssetRegistry registry(m_root);
+    ASSERT_TRUE(registry.scan().has_value());
+
+    for (auto const& [id, entry] : registry.entries()) {
+        EXPECT_EQ(entry.display_name(), "scene") << "key " << entry.key;
+    }
+}
+
+TEST_F(Registry, DuplicateKeyIsReportedAsAWarning)
+{
+    add_file("Textures/Error.png");
+    add_file("Textures/Error.jpg");
+
+    Asset::AssetRegistry registry(m_root);
+    ASSERT_TRUE(registry.scan().has_value());
+
+    EXPECT_EQ(registry.entries().size(), 1U);
+    EXPECT_TRUE(registry.key_to_id("Textures/Error").has_value());
+
+    auto const logged = captured_warnings();
+    EXPECT_NE(logged.find("Textures/Error"), std::string::npos);
+    EXPECT_NE(logged.find("WARN"), std::string::npos);
 }

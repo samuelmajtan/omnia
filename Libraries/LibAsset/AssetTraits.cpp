@@ -12,86 +12,6 @@
 
 namespace Asset {
 
-auto AssetTraits<ShaderData>::extensions() -> std::vector<std::string>
-{
-    return Importer::supported_extensions();
-}
-
-auto AssetTraits<ShaderData>::import(ImportContext const& context) -> Common::Expected<ShaderData>
-{
-    return Importer::import(context);
-}
-
-auto AssetTraits<ShaderData>::source_hash(ImportContext const& context) -> Common::Expected<u64>
-{
-    return Importer::source_hash(context);
-}
-
-auto AssetTraits<ShaderData>::enumerate_sub_assets(std::filesystem::path const&) -> Common::Expected<std::vector<SubAssetDescriptor>>
-{
-    return std::vector<SubAssetDescriptor> {};
-}
-
-auto AssetTraits<TextureData>::extensions() -> std::vector<std::string>
-{
-    return Importer::supported_extensions();
-}
-
-auto AssetTraits<TextureData>::import(ImportContext const& context) -> Common::Expected<TextureData>
-{
-    return Importer::import(context);
-}
-
-auto AssetTraits<TextureData>::source_hash(ImportContext const& context) -> Common::Expected<u64>
-{
-    return Importer::source_hash(context);
-}
-
-auto AssetTraits<TextureData>::enumerate_sub_assets(std::filesystem::path const&) -> Common::Expected<std::vector<SubAssetDescriptor>>
-{
-    return std::vector<SubAssetDescriptor> {};
-}
-
-auto AssetTraits<ModelData>::extensions() -> std::vector<std::string>
-{
-    return Importer::supported_extensions();
-}
-
-auto AssetTraits<ModelData>::import(ImportContext const& context) -> Common::Expected<ModelData>
-{
-    return Importer::import(context);
-}
-
-auto AssetTraits<ModelData>::source_hash(ImportContext const& context) -> Common::Expected<u64>
-{
-    return Importer::source_hash(context);
-}
-
-auto AssetTraits<ModelData>::enumerate_sub_assets(std::filesystem::path const& path) -> Common::Expected<std::vector<SubAssetDescriptor>>
-{
-    return Importer::enumerate_sub_assets(path);
-}
-
-auto AssetTraits<AnimationData>::extensions() -> std::vector<std::string>
-{
-    return Importer::supported_extensions();
-}
-
-auto AssetTraits<AnimationData>::import(ImportContext const& context) -> Common::Expected<AnimationData>
-{
-    return Importer::import(context);
-}
-
-auto AssetTraits<AnimationData>::source_hash(ImportContext const& context) -> Common::Expected<u64>
-{
-    return Importer::source_hash(context);
-}
-
-auto AssetTraits<AnimationData>::enumerate_sub_assets(std::filesystem::path const&) -> Common::Expected<std::vector<SubAssetDescriptor>>
-{
-    return std::vector<SubAssetDescriptor> {};
-}
-
 static_assert(AssetData<ShaderData>);
 static_assert(AssetData<TextureData>);
 static_assert(AssetData<ModelData>);
@@ -101,11 +21,11 @@ static_assert(AssetData<AnimationData>);
 
 void AssetTraits<ShaderData>::write(Binary::ByteWriter& writer, ShaderData const& data)
 {
-    writer.write(static_cast<u8>(data.stage));
+    writer.write_enum(data.stage);
     writer.write(static_cast<u64>(data.variants.size()));
 
     for (auto const& variant : data.variants) {
-        writer.write(static_cast<u8>(variant.format));
+        writer.write_enum(variant.format);
         writer.write_vector(variant.bytecode);
     }
 }
@@ -131,7 +51,7 @@ void AssetTraits<TextureData>::write(Binary::ByteWriter& writer, TextureData con
 {
     writer.write(data.width);
     writer.write(data.height);
-    writer.write(static_cast<u8>(data.color_space));
+    writer.write_enum(data.color_space);
     writer.write_vector(data.data);
 }
 
@@ -299,8 +219,8 @@ void AssetTraits<AnimationData>::write(Binary::ByteWriter& writer, AnimationData
     writer.write(static_cast<u64>(data.channels.size()));
     for (auto const& channel : data.channels) {
         writer.write(channel.target_node);
-        writer.write(static_cast<u8>(channel.target_property));
-        writer.write(static_cast<u8>(channel.interpolation));
+        writer.write_enum(channel.target_property);
+        writer.write_enum(channel.interpolation);
         writer.write_vector(channel.keyframes);
     }
 }

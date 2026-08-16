@@ -28,64 +28,60 @@ namespace Asset {
 template<typename T>
 struct AssetTraits;
 
+template<typename T, typename ImporterType, AssetType ASSET_TYPE>
+struct ImporterTraits {
+    using Importer = ImporterType;
+
+    static constexpr auto TYPE = ASSET_TYPE;
+    static constexpr auto VERSION = ImporterType::VERSION;
+
+    static auto extensions() -> std::vector<std::string>
+    {
+        return Importer::supported_extensions();
+    }
+
+    static auto import(ImportContext const& context) -> Common::Expected<T>
+    {
+        return Importer::import(context);
+    }
+
+    static auto source_hash(ImportContext const& context) -> Common::Expected<u64>
+    {
+        return Importer::source_hash(context);
+    }
+
+    static auto enumerate_sub_assets(std::filesystem::path const& path) -> Common::Expected<std::vector<SubAssetDescriptor>>
+    {
+        if constexpr (requires { Importer::enumerate_sub_assets(path); }) {
+            return Importer::enumerate_sub_assets(path);
+        } else {
+            return std::vector<SubAssetDescriptor> {};
+        }
+    }
+};
+
 template<>
-struct ASSET_API AssetTraits<ShaderData> {
-    using Importer = ShaderImporter;
-
-    static constexpr auto TYPE = AssetType::Shader;
-    static constexpr auto VERSION = ShaderImporter::VERSION;
-
-    static auto extensions() -> std::vector<std::string>;
-    static auto import(ImportContext const& context) -> Common::Expected<ShaderData>;
-    static auto source_hash(ImportContext const& context) -> Common::Expected<u64>;
+struct ASSET_API AssetTraits<ShaderData> : ImporterTraits<ShaderData, ShaderImporter, AssetType::Shader> {
     static void write(Binary::ByteWriter& writer, ShaderData const& data);
     static auto read(Binary::ByteReader& reader) -> Common::Expected<ShaderData>;
-    static auto enumerate_sub_assets(std::filesystem::path const& path) -> Common::Expected<std::vector<SubAssetDescriptor>>;
 };
 
 template<>
-struct ASSET_API AssetTraits<TextureData> {
-    using Importer = TextureImporter;
-
-    static constexpr auto TYPE = AssetType::Texture;
-    static constexpr auto VERSION = TextureImporter::VERSION;
-
-    static auto extensions() -> std::vector<std::string>;
-    static auto import(ImportContext const& context) -> Common::Expected<TextureData>;
-    static auto source_hash(ImportContext const& context) -> Common::Expected<u64>;
+struct ASSET_API AssetTraits<TextureData> : ImporterTraits<TextureData, TextureImporter, AssetType::Texture> {
     static void write(Binary::ByteWriter& writer, TextureData const& data);
     static auto read(Binary::ByteReader& reader) -> Common::Expected<TextureData>;
-    static auto enumerate_sub_assets(std::filesystem::path const& path) -> Common::Expected<std::vector<SubAssetDescriptor>>;
 };
 
 template<>
-struct ASSET_API AssetTraits<ModelData> {
-    using Importer = ModelImporter;
-
-    static constexpr auto TYPE = AssetType::Model;
-    static constexpr auto VERSION = ModelImporter::VERSION;
-
-    static auto extensions() -> std::vector<std::string>;
-    static auto import(ImportContext const& context) -> Common::Expected<ModelData>;
-    static auto source_hash(ImportContext const& context) -> Common::Expected<u64>;
+struct ASSET_API AssetTraits<ModelData> : ImporterTraits<ModelData, ModelImporter, AssetType::Model> {
     static void write(Binary::ByteWriter& writer, ModelData const& data);
     static auto read(Binary::ByteReader& reader) -> Common::Expected<ModelData>;
-    static auto enumerate_sub_assets(std::filesystem::path const& path) -> Common::Expected<std::vector<SubAssetDescriptor>>;
 };
 
 template<>
-struct ASSET_API AssetTraits<AnimationData> {
-    using Importer = AnimationImporter;
-
-    static constexpr auto TYPE = AssetType::Animation;
-    static constexpr auto VERSION = AnimationImporter::VERSION;
-
-    static auto extensions() -> std::vector<std::string>;
-    static auto import(ImportContext const& context) -> Common::Expected<AnimationData>;
-    static auto source_hash(ImportContext const& context) -> Common::Expected<u64>;
+struct ASSET_API AssetTraits<AnimationData> : ImporterTraits<AnimationData, AnimationImporter, AssetType::Animation> {
     static void write(Binary::ByteWriter& writer, AnimationData const& data);
     static auto read(Binary::ByteReader& reader) -> Common::Expected<AnimationData>;
-    static auto enumerate_sub_assets(std::filesystem::path const& path) -> Common::Expected<std::vector<SubAssetDescriptor>>;
 };
 
 template<typename T>

@@ -60,6 +60,12 @@ public:
         m_data.insert(m_data.end(), bytes, bytes + value.size());
     }
 
+    template<Enumeration Enum>
+    void write_enum(Enum value)
+    {
+        write(static_cast<u8>(value));
+    }
+
     template<Serializable T>
     void write_optional(std::optional<T> const& value)
     {

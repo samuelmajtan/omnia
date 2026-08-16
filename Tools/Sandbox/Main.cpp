@@ -9,12 +9,14 @@
 #include <Common/Expected.h>
 #include <Common/Time.h>
 #include <Common/Types.h>
+#include <LibAsset/AnimationPlayer.h>
 #include <LibAsset/AssetManager.h>
 #include <LibDebug/Logger.h>
 #include <LibMath/Math.h>
 #include <LibPlatform/Event.h>
 #include <LibPlatform/Window.h>
 #include <LibRHI/Device.h>
+#include <LibRenderer/AnimatedModel.h>
 #include <LibRenderer/Camera.h>
 #include <LibRenderer/DeferredRenderer.h>
 #include <LibRenderer/Light.h>
@@ -24,6 +26,10 @@
 namespace {
 
 constexpr Debug::Logger Log { "Sandbox" };
+
+constexpr std::string_view CHARACTER_MODEL_KEY = "Models/CesiumMan/CesiumMan";
+constexpr std::string_view CHARACTER_CLIP_NAME = "Animation_0";
+constexpr f32 CAMERA_SPEED = 20.0F;
 
 }
 
@@ -80,6 +86,8 @@ public:
         sandbox->m_camera = Renderer::Camera(camera_config);
 
         sandbox->m_sponza = TRY(sandbox->m_resource_manager->load_model("Models/sponza/Sponza"));
+        TRY(sandbox->load_character(swapchain_config.frames_in_flight));
+        sandbox->build_render_items();
 
         TRY(sandbox->create_swapchain_render_targets());
 
@@ -88,6 +96,35 @@ public:
 
         OA_LOG_INFO(Log, "Startup complete in {:.1f}ms", stopwatch.elapsed_milliseconds());
         return sandbox;
+    }
+
+    auto load_character(u32 frames_in_flight) -> Common::Expected<void>
+    {
+        m_character = TRY(m_resource_manager->load_animated_model(std::string(CHARACTER_MODEL_KEY), frames_in_flight));
+        m_character->set_looping(true);
+        TRY(m_character->play(CHARACTER_CLIP_NAME));
+
+        for (auto const& clip : m_character->animations()) {
+            OA_LOG_INFO(Log, "'{}' is {:.2f}s long over {} channels", clip.name(), clip.duration(), clip.channel_count());
+        }
+        OA_LOG_INFO(Log, "Playing '{}' on a {} bone skeleton", CHARACTER_CLIP_NAME, m_character->model()->skeleton()->bone_count());
+        return {};
+    }
+
+    void build_render_items()
+    {
+        m_render_items.push_back({
+            .model = m_sponza,
+            .model_matrix = Math::Mat4f::scale(0.05F, 0.05F, 0.05F),
+            .bone_resource_set = nullptr
+        });
+
+        m_character_item = m_render_items.size();
+        m_render_items.push_back({
+            .model = m_character->model(),
+            .model_matrix = Math::Mat4f::translation(0.0F, 100.0F, -15.0F) * Math::Mat4f::scale(10.0F, 10.0F, 10.0F),
+            .bone_resource_set = nullptr
+        });
     }
 
     auto on_mouse_delta(Platform::MouseDeltaEvent const& event) -> bool
@@ -141,7 +178,12 @@ public:
 
     void run()
     {
+        Time::Stopwatch frame_timer;
+
         while (m_window->is_running()) {
+            auto const delta_seconds = static_cast<f32>(frame_timer.elapsed_seconds());
+            frame_timer.restart();
+
             m_window->poll_events();
 
             if (m_window->is_minimized()) {
@@ -164,7 +206,7 @@ public:
                 movement -= m_camera.right() * (m_window->input().is_key_down(Key::A) ? 1.0F : 0.0F);
                 movement += m_camera.right() * (m_window->input().is_key_down(Key::D) ? 1.0F : 0.0F);
                 movement.normalize();
-                m_camera.translate(movement * 0.075F);
+                m_camera.translate(movement * (CAMERA_SPEED * delta_seconds));
             }
 
             auto frame = m_swapchain->begin_frame();
@@ -173,19 +215,8 @@ public:
             }
             auto [cmd, image_index, frame_index] = frame.value();
 
-            // TODO: Don't create this every frame, just update the model matrix
-            std::vector<Renderer::RenderItem> render_items;
-            render_items.reserve(m_sponza->sub_meshes().size());
-            for (auto const& sub_mesh : m_sponza->sub_meshes()) {
-                auto const& materials = m_sponza->materials();
-                render_items.push_back({
-                    .vertex_buffer = sub_mesh.vertex_buffer(),
-                    .index_buffer = sub_mesh.index_buffer(),
-                    .material_resource_set = materials[sub_mesh.material_index()].resource_set(),
-                    .index_count = sub_mesh.index_count(),
-                    .model_matrix = Math::Mat4f::scale(0.05F, 0.05F, 0.05F)
-                });
-            }
+            m_character->update(delta_seconds, frame_index);
+            m_render_items[m_character_item].bone_resource_set = m_character->bone_resource_set(frame_index);
 
             auto light_direction = Math::Vec3f(0.0F, -1.0F, 0.5F).normalized();
             auto light_position = -light_direction * 1000.0F;
@@ -207,7 +238,7 @@ public:
                 .frame_index = frame_index,
                 .output_render_target = m_swapchain_render_targets[image_index].get(),
                 .command_buffer = cmd,
-                .render_items = render_items
+                .render_items = m_render_items
             };
             m_deferred_renderer->submit(submit_info);
 
@@ -231,7 +262,10 @@ private:
     Asset::AssetManager m_asset_manager = Asset::AssetManager("Resources/");
     std::unique_ptr<Renderer::ResourceManager> m_resource_manager;
     std::unique_ptr<Renderer::DeferredRenderer> m_deferred_renderer;
-    Renderer::Model const* m_sponza;
+    Renderer::Model const* m_sponza {};
+    std::unique_ptr<Renderer::AnimatedModel> m_character;
+    std::vector<Renderer::RenderItem> m_render_items;
+    u64 m_character_item {};
     Renderer::Camera m_camera {};
     bool m_was_window_resized = false;
 };

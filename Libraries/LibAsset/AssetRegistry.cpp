@@ -129,7 +129,10 @@ auto AssetRegistry::register_sub_asset(AssetEntry const& parent, SubAssetDescrip
     };
 
     OA_LOG_TRACE(Log::Registry, "{} -> {} ({})", entry.key, entry.id(), to_string(entry.type()));
-    return register_asset(entry);
+    TRY(register_asset(entry));
+
+    m_sub_assets_by_parent[parent.id()].push_back(entry.id());
+    return {};
 }
 
 auto AssetRegistry::key_to_id(std::string const& key) const -> std::optional<AssetID>
@@ -139,6 +142,28 @@ auto AssetRegistry::key_to_id(std::string const& key) const -> std::optional<Ass
         return std::nullopt;
     }
     return it->second;
+}
+
+auto AssetRegistry::sub_assets_of(AssetID parent, AssetType sub_asset_type) const -> std::vector<AssetID>
+{
+    auto const it = m_sub_assets_by_parent.find(parent);
+    if (it == m_sub_assets_by_parent.end()) {
+        return {};
+    }
+
+    std::vector<AssetID> result;
+    for (auto const& sub_asset_id : it->second) {
+        auto const asset = resolve(sub_asset_id);
+        if (!asset.has_value()) {
+            OA_LOG_WARN(Log::Registry, "Sub-asset {} of {} is registered but not found in the registry", sub_asset_id, parent);
+            continue;
+        }
+        if (asset->type() != sub_asset_type) {
+            continue;
+        }
+        result.push_back(sub_asset_id);
+    }
+    return result;
 }
 
 auto AssetRegistry::resolve(AssetID id) const -> Common::Expected<AssetEntry>

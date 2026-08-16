@@ -98,23 +98,23 @@ auto AnimationImporter::import(ImportContext const& context) -> Common::Expected
             }
 
             AnimationChannel imported {
-                .node_index = node->second,
-                .path = path.value(),
+                .target_node = node->second,
+                .target_property = path.value(),
                 .interpolation = interpolation.value(),
-                .times = std::vector<f32>(input->count),
-                .values = std::vector<f32>(output->count * components)
+                .keyframes = std::vector<Keyframe>(input->count)
             };
 
             for (cgltf_size key = 0; key < input->count; ++key) {
-                cgltf_accessor_read_float(input, key, &imported.times[key], 1);
-                cgltf_accessor_read_float(output, key, &imported.values[key * components], components);
+                cgltf_accessor_read_float(input, key, &imported.keyframes[key].time, 1);
+                cgltf_accessor_read_float(output, key, &imported.keyframes[key].value.x, components);
             }
 
-            if (!std::ranges::is_sorted(imported.times)) {
+            auto const ascending = std::ranges::is_sorted(imported.keyframes, {}, &Keyframe::time);
+            if (!ascending) {
                 return OA_ERROR("Clip '{}' in '{}' has a channel whose keyframe times are not ascending", wanted, context.path.string());
             }
-            if (!imported.times.empty()) {
-                clip.duration = std::max(clip.duration, imported.times.back());
+            if (!imported.keyframes.empty()) {
+                clip.duration = std::max(clip.duration, imported.keyframes.back().time);
             }
 
             clip.channels.push_back(std::move(imported));

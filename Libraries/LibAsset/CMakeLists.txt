@@ -1,5 +1,9 @@
 set(SOURCES
+        AnimationClip.cpp
         AnimationImporter.cpp
+        AnimationPlayer.cpp
+        Pose.cpp
+        Skeleton.cpp
         AssetFile.cpp
         AssetManager.cpp
         AssetRegistry.cpp

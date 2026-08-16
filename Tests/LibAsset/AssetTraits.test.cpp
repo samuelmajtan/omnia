@@ -515,16 +515,17 @@ auto make_animation() -> Asset::AnimationData
         .name = "March",
         .duration = 1.5F,
         .channels = {
-            { .node_index = 3,
-                .path = Asset::AnimationPath::Translation,
+            { .target_node = 3,
+                .target_property = Asset::AnimationPath::Translation,
                 .interpolation = Asset::AnimationInterpolation::Linear,
-                .times = { 0.0F, 0.75F, 1.5F },
-                .values = { 0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F, 2.0F, 0.0F } },
-            { .node_index = 7,
-                .path = Asset::AnimationPath::Rotation,
+                .keyframes = { { .time = 0.0F, .value = { 0.0F, 0.0F, 0.0F, 0.0F } },
+                    { .time = 0.75F, .value = { 0.0F, 1.0F, 0.0F, 0.0F } },
+                    { .time = 1.5F, .value = { 0.0F, 2.0F, 0.0F, 0.0F } } } },
+            { .target_node = 7,
+                .target_property = Asset::AnimationPath::Rotation,
                 .interpolation = Asset::AnimationInterpolation::Step,
-                .times = { 0.0F, 1.5F },
-                .values = { 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.7071F, 0.0F, 0.7071F } },
+                .keyframes = { { .time = 0.0F, .value = { 0.0F, 0.0F, 0.0F, 1.0F } },
+                    { .time = 1.5F, .value = { 0.0F, 0.7071F, 0.0F, 0.7071F } } } },
         }
     };
 }
@@ -551,11 +552,10 @@ TEST(SerializeAnimation, RoundTrips)
     ASSERT_EQ(actual.channels.size(), original.channels.size());
 
     for (std::size_t index = 0; index < actual.channels.size(); ++index) {
-        EXPECT_EQ(actual.channels[index].node_index, original.channels[index].node_index);
-        EXPECT_EQ(actual.channels[index].path, original.channels[index].path);
+        EXPECT_EQ(actual.channels[index].target_node, original.channels[index].target_node);
+        EXPECT_EQ(actual.channels[index].target_property, original.channels[index].target_property);
         EXPECT_EQ(actual.channels[index].interpolation, original.channels[index].interpolation);
-        EXPECT_TRUE(same_bytes(actual.channels[index].times, original.channels[index].times));
-        EXPECT_TRUE(same_bytes(actual.channels[index].values, original.channels[index].values));
+        EXPECT_TRUE(same_bytes(actual.channels[index].keyframes, original.channels[index].keyframes));
     }
 }
 
@@ -567,18 +567,10 @@ TEST(SerializeAnimation, EmptyClipRoundTrips)
     EXPECT_TRUE(result.value().channels.empty());
 }
 
-TEST(SerializeAnimation, ChannelWithTheWrongValueCountIsRejected)
-{
-    auto animation = make_animation();
-    animation.channels[0].values.pop_back();
-
-    EXPECT_FALSE(round_trip(animation).has_value());
-}
-
 TEST(SerializeAnimation, UnsortedKeyframeTimesAreRejected)
 {
     auto animation = make_animation();
-    std::ranges::reverse(animation.channels[0].times);
+    std::ranges::reverse(animation.channels[0].keyframes);
 
     EXPECT_FALSE(round_trip(animation).has_value());
 }

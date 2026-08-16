@@ -49,6 +49,7 @@ enum class AttributeFormat : u8 {
     Float32Vec2,
     Float32Vec3,
     Float32Vec4,
+    Uint32Vec4,
 };
 
 class Pipeline {

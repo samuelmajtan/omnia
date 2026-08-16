@@ -15,12 +15,12 @@
 
 namespace Renderer {
 
+class Model;
+
 struct RenderItem {
-    RHI::Buffer const* vertex_buffer;
-    RHI::Buffer const* index_buffer;
-    RHI::ResourceSet const* material_resource_set;
-    u64 index_count;
+    Model const* model {};
     Math::Mat4f model_matrix;
+    RHI::ResourceSet const* bone_resource_set {};
 };
 
 struct FrameData {

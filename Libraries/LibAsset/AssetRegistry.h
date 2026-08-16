@@ -8,6 +8,7 @@
 
 #include <expected>
 #include <filesystem>
+#include <span>
 #include <unordered_map>
 #include <variant>
 #include <vector>
@@ -79,6 +80,7 @@ public:
     auto register_asset(AssetEntry const& entry) -> Common::Expected<void>;
     auto register_sub_asset(AssetEntry const& parent, SubAssetDescriptor const& descriptor) -> Common::Expected<void>;
     auto key_to_id(std::string const& key) const -> std::optional<AssetID>;
+    auto sub_assets_of(AssetID parent, AssetType sub_asset_type) const -> std::vector<AssetID>;
     auto resolve(AssetID id) const -> Common::Expected<AssetEntry>;
     auto resolve_sub_asset_key(std::string const& parent_key, std::string const& sub_asset_name) -> std::string;
     auto resolve_key(std::filesystem::path path) const -> std::string;
@@ -87,6 +89,7 @@ private:
     std::filesystem::path m_root_directory;
     std::unordered_map<AssetID, AssetEntry> m_assets_by_id;
     std::unordered_map<std::string, AssetID> m_ids_by_key;
+    std::unordered_map<AssetID, std::vector<AssetID>> m_sub_assets_by_parent;
 };
 
 }

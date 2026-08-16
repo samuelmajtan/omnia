@@ -30,6 +30,7 @@ public:
     auto index_buffer() const -> RHI::Buffer const*;
     auto index_count() const -> u64;
     auto material_index() const -> u64;
+    auto is_skinned() const -> bool;
 private:
     SubMesh() = default;
 private:
@@ -37,6 +38,7 @@ private:
     std::unique_ptr<RHI::Buffer> m_index_buffer;
     u64 m_index_count {};
     u64 m_material_index {};
+    bool m_is_skinned {};
 };
 
 }

@@ -298,11 +298,10 @@ void AssetTraits<AnimationData>::write(Binary::ByteWriter& writer, AnimationData
 
     writer.write(static_cast<u64>(data.channels.size()));
     for (auto const& channel : data.channels) {
-        writer.write(channel.node_index);
-        writer.write(static_cast<u8>(channel.path));
+        writer.write(channel.target_node);
+        writer.write(static_cast<u8>(channel.target_property));
         writer.write(static_cast<u8>(channel.interpolation));
-        writer.write_vector(channel.times);
-        writer.write_vector(channel.values);
+        writer.write_vector(channel.keyframes);
     }
 }
 
@@ -320,18 +319,12 @@ auto AssetTraits<AnimationData>::read(Binary::ByteReader& reader) -> Common::Exp
     data.channels.reserve(channel_count);
     for (u64 index = 0; index < channel_count; ++index) {
         AnimationChannel channel;
-        channel.node_index = TRY(reader.read<u32>());
-        channel.path = TRY(reader.read_enum<AnimationPath>());
+        channel.target_node = TRY(reader.read<u32>());
+        channel.target_property = TRY(reader.read_enum<AnimationPath>());
         channel.interpolation = TRY(reader.read_enum<AnimationInterpolation>());
-        channel.times = TRY(reader.read_vector<f32>());
-        channel.values = TRY(reader.read_vector<f32>());
+        channel.keyframes = TRY(reader.read_vector<Keyframe>());
 
-        auto const components = components_for(channel.path);
-        if (channel.values.size() != channel.times.size() * components) {
-            return OA_ERROR("Animation '{}' has a channel with {} keyframe times but {} values, expected {} per key",
-                data.name, channel.times.size(), channel.values.size(), components);
-        }
-        if (!std::ranges::is_sorted(channel.times)) {
+        if (!std::ranges::is_sorted(channel.keyframes, {}, &Keyframe::time)) {
             return OA_ERROR("Animation '{}' has a channel whose keyframe times are not ascending", data.name);
         }
         data.channels.push_back(std::move(channel));

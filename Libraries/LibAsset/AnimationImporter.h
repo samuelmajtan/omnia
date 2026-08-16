@@ -31,12 +31,26 @@ inline constexpr auto components_for(AnimationPath path) -> u32
     return path == AnimationPath::Rotation ? 4 : 3;
 }
 
+struct Keyframe {
+    f32 time {};
+    Math::Vec4f value {};
+
+    auto vector() const -> Math::Vec3f
+    {
+        return value.xyz();
+    }
+
+    auto quaternion() const -> Math::Quatf
+    {
+        return { value.x, value.y, value.z, value.w };
+    }
+};
+
 struct AnimationChannel {
-    u32 node_index {};
-    AnimationPath path {};
+    u32 target_node {};
+    AnimationPath target_property {};
     AnimationInterpolation interpolation {};
-    std::vector<f32> times;
-    std::vector<f32> values;
+    std::vector<Keyframe> keyframes;
 };
 
 struct AnimationData {
@@ -47,7 +61,7 @@ struct AnimationData {
 
 class ASSET_API AnimationImporter final {
 public:
-    static constexpr u32 VERSION = 1;
+    static constexpr u32 VERSION = 2;
 
 public:
     static auto import(ImportContext const& context) -> Common::Expected<AnimationData>;

@@ -153,6 +153,12 @@ constexpr auto dot(Vec3<T> const& a, Vec3<T> const& b) -> T
     return (a.x * b.x) + (a.y * b.y) + (a.z * b.z);
 }
 
+template<typename T>
+constexpr auto lerp(Vec3<T> const& a, Vec3<T> const& b, T alpha) -> Vec3<T>
+{
+    return a + ((b - a) * alpha);
+}
+
 using Vec3f = Vec3<f32>;
 using Vec3d = Vec3<f64>;
 using Vec3i = Vec3<i32>;

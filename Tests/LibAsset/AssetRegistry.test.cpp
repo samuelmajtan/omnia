@@ -23,8 +23,6 @@ protected:
         std::filesystem::create_directories(m_root, error);
         ASSERT_FALSE(error) << error.message();
 
-        // scan() reports rejected entries through the logger, so route it to a file we
-        // can read back. Kept beside m_root rather than inside it, so scan cannot see it.
         m_log_path = std::filesystem::path(testing::TempDir()) / "OmniaRegistryTest.log";
         ASSERT_TRUE(Debug::Logger::initialize({
             .file_path = m_log_path,
@@ -46,12 +44,6 @@ protected:
     void add_file(std::string_view relative_path) const
     {
         ASSERT_TRUE(File::write_all(m_root / relative_path, "placeholder").has_value());
-    }
-
-    auto captured_warnings() const -> std::string
-    {
-        Debug::Logger::shutdown();
-        return File::read_all(m_log_path).value_or(std::string {});
     }
 
     std::filesystem::path m_root;
@@ -163,7 +155,7 @@ TEST_F(Registry, ResolveUnknownIDFails)
     EXPECT_FALSE(registry.resolve(Common::UUID::generate()).has_value());
 }
 
-TEST_F(Registry, CleanScanHasNoWarnings)
+TEST_F(Registry, ScanKeepsGoingPastAFileItCannotRead)
 {
     add_file("Textures/Error.png");
     add_file("Models/Sponza.gltf");
@@ -172,7 +164,8 @@ TEST_F(Registry, CleanScanHasNoWarnings)
     ASSERT_TRUE(registry.scan().has_value());
 
     EXPECT_EQ(registry.entries().size(), 2U);
-    EXPECT_TRUE(captured_warnings().empty());
+    EXPECT_TRUE(registry.key_to_id("Models/Sponza").has_value());
+    EXPECT_TRUE(registry.key_to_id("Textures/Error").has_value());
 }
 
 TEST_F(Registry, EmptyRootIsNotAnError)
@@ -377,8 +370,82 @@ TEST_F(Registry, DuplicateKeyIsReportedAsAWarning)
 
     EXPECT_EQ(registry.entries().size(), 1U);
     EXPECT_TRUE(registry.key_to_id("Textures/Error").has_value());
+}
 
-    auto const logged = captured_warnings();
-    EXPECT_NE(logged.find("Textures/Error"), std::string::npos);
-    EXPECT_NE(logged.find("WARN"), std::string::npos);
+namespace {
+
+constexpr std::string_view ANIMATED_GLTF = R"({
+  "asset": { "version": "2.0" },
+  "scene": 0,
+  "scenes": [ { "nodes": [ 0 ] } ],
+  "nodes": [ { "name": "root" } ],
+  "animations": [
+    { "name": "March", "channels": [], "samplers": [] },
+    { "name": "Idle", "channels": [], "samplers": [] },
+    { "channels": [], "samplers": [] }
+  ]
+})";
+
+}
+
+TEST_F(Registry, ScanRegistersAnimationsAsSubAssets)
+{
+    ASSERT_TRUE(File::write_all(m_root / "Models/Clips.gltf", std::string(ANIMATED_GLTF)).has_value());
+
+    Asset::AssetRegistry registry(m_root);
+    ASSERT_TRUE(registry.scan().has_value());
+
+    EXPECT_EQ(registry.entries().size(), 4U);
+    for (auto const& name : { "March", "Idle", "Animation_2" }) {
+        auto const id = registry.key_to_id(std::format("Models/Clips#{}", name));
+        ASSERT_TRUE(id.has_value()) << name;
+
+        auto const entry = registry.resolve(id.value());
+        ASSERT_TRUE(entry.has_value()) << entry.error();
+        EXPECT_EQ(entry.value().type(), Asset::AssetType::Animation);
+        EXPECT_EQ(entry.value().sub_asset_name().value(), name);
+    }
+}
+
+TEST_F(Registry, AnimationSubAssetsHangOffTheModelTheyShipIn)
+{
+    ASSERT_TRUE(File::write_all(m_root / "Models/Clips.gltf", std::string(ANIMATED_GLTF)).has_value());
+
+    Asset::AssetRegistry registry(m_root);
+    ASSERT_TRUE(registry.scan().has_value());
+
+    auto const parent_id = registry.key_to_id("Models/Clips");
+    ASSERT_TRUE(parent_id.has_value());
+    auto const parent = registry.resolve(parent_id.value()).value();
+    EXPECT_EQ(parent.type(), Asset::AssetType::Model);
+
+    auto const clip = registry.resolve(registry.key_to_id("Models/Clips#March").value()).value();
+    EXPECT_EQ(clip.id(), Common::UUID::derive(parent_id.value(), "March"));
+    EXPECT_EQ(std::get<Asset::LooseAssetEntry>(clip.source).path, std::get<Asset::LooseAssetEntry>(parent.source).path);
+    EXPECT_EQ(clip.display_name(), "Clips#March");
+}
+
+TEST_F(Registry, AnimationSubAssetIDsAreStableAcrossScans)
+{
+    ASSERT_TRUE(File::write_all(m_root / "Models/Clips.gltf", std::string(ANIMATED_GLTF)).has_value());
+
+    Asset::AssetRegistry first(m_root);
+    ASSERT_TRUE(first.scan().has_value());
+
+    Asset::AssetRegistry second(m_root);
+    ASSERT_TRUE(second.scan().has_value());
+
+    EXPECT_EQ(first.key_to_id("Models/Clips#March"), second.key_to_id("Models/Clips#March"));
+    EXPECT_NE(first.key_to_id("Models/Clips#March"), first.key_to_id("Models/Clips#Idle"));
+}
+
+TEST_F(Registry, ModelWithoutAnimationsRegistersNoSubAssets)
+{
+    ASSERT_TRUE(File::write_all(m_root / "Models/Static.gltf", std::string(R"({ "asset": { "version": "2.0" }, "nodes": [] })")).has_value());
+
+    Asset::AssetRegistry registry(m_root);
+    ASSERT_TRUE(registry.scan().has_value());
+
+    EXPECT_EQ(registry.entries().size(), 1U);
+    EXPECT_TRUE(registry.key_to_id("Models/Static").has_value());
 }

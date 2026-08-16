@@ -22,8 +22,6 @@
 
 namespace Asset {
 
-inline constexpr char SUB_ASSET_SEPARATOR = '#';
-
 struct LooseAssetEntry {
     std::filesystem::path path;
     std::optional<std::string> sub_asset = std::nullopt;
@@ -75,7 +73,6 @@ class ASSET_API AssetRegistry final {
 
 public:
     explicit AssetRegistry(std::filesystem::path const& root_directory);
-
 
     auto scan() -> Common::Expected<void>;
 

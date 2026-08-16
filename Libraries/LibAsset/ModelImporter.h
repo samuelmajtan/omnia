@@ -25,24 +25,10 @@ struct MaterialData {
     Graphics::MaterialParameters parameters;
 };
 
-struct SkeletonNode {
-    std::string name;
-    i32 parent_index = -1;
-    Math::Vec3f translation {};
-    Math::Quatf rotation {};
-    Math::Vec3f scale { 1.0F, 1.0F, 1.0F };
-};
-
-struct SkeletonData {
-    std::vector<SkeletonNode> nodes;
-    std::vector<u32> bone_nodes;
-    std::vector<Math::Mat4f> inverse_bind_matrices;
-};
-
 struct ModelData {
     std::vector<Graphics::SubMeshData> sub_meshes;
     std::vector<MaterialData> materials;
-    std::optional<SkeletonData> skeleton = std::nullopt;
+    std::optional<Graphics::SkeletonData> skeleton = std::nullopt;
 };
 
 class ASSET_API ModelImporter final {
@@ -53,6 +39,7 @@ public:
     static auto import(ImportContext const& context) -> Common::Expected<ModelData>;
     static auto source_hash(ImportContext const& context) -> Common::Expected<u64>;
     static auto supported_extensions() -> std::vector<std::string>;
+    static auto enumerate_sub_assets(std::filesystem::path const& path) -> Common::Expected<std::vector<SubAssetDescriptor>>;
 private:
     static auto import_gltf(ImportContext const& context) -> Common::Expected<ModelData>;
 };

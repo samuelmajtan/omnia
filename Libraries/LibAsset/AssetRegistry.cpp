@@ -70,6 +70,17 @@ auto AssetRegistry::scan() -> Common::Expected<void>
             OA_LOG_WARN(Log::Registry, "{}", result.error());
             continue;
         }
+
+        auto const sub_assets = sub_assets_for(asset_entry.type(), entry.path());
+        if (!sub_assets.has_value()) {
+            OA_LOG_DEBUG(Log::Registry, "No sub-assets listed for '{}': {}", asset_entry.key, sub_assets.error());
+            continue;
+        }
+        for (auto const& descriptor : sub_assets.value()) {
+            if (auto result = register_sub_asset(asset_entry, descriptor); !result.has_value()) {
+                OA_LOG_WARN(Log::Registry, "{}", result.error());
+            }
+        }
     }
 
     return {};

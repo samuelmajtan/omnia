@@ -4,76 +4,18 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-#define CGLTF_IMPLEMENTATION
-#include <cgltf.h>
-#include <array>
-#include <cstring>
-#include <limits>
-#include <set>
-#include <tuple>
-#include <unordered_map>
-
 #include <Common/Expected.h>
 #include <Common/File.h>
 #include <Common/Time.h>
 #include <LibAsset/Log.h>
 #include <LibAsset/ModelImporter.h>
+#include <LibAsset/glTF.h>
 
 namespace Asset {
 
 namespace {
 
-auto local_transform(cgltf_node const& node) -> std::tuple<Math::Vec3f, Math::Quatf, Math::Vec3f>
-{
-    if (node.has_matrix) {
-        Math::Mat4f matrix;
-        std::memcpy(matrix.data(), node.matrix, sizeof(f32) * 16);
-        return matrix.decompose();
-    }
-
-    return {
-        node.has_translation ? Math::Vec3f(node.translation[0], node.translation[1], node.translation[2]) : Math::Vec3f {},
-        node.has_rotation ? Math::Quatf(node.rotation[0], node.rotation[1], node.rotation[2], node.rotation[3]) : Math::Quatf::identity(),
-        node.has_scale ? Math::Vec3f(node.scale[0], node.scale[1], node.scale[2]) : Math::Vec3f(1.0F, 1.0F, 1.0F)
-    };
-}
-
-auto flatten_node_hierarchy(cgltf_data const* data) -> std::pair<std::vector<SkeletonNode>, std::unordered_map<cgltf_node const*, u32>>
-{
-    std::vector<SkeletonNode> nodes;
-    std::unordered_map<cgltf_node const*, u32> indices;
-    nodes.reserve(data->nodes_count);
-
-    std::vector<std::pair<cgltf_node const*, i32>> pending;
-    for (cgltf_size i = data->nodes_count; i-- > 0;) {
-        if (data->nodes[i].parent == nullptr) {
-            pending.emplace_back(&data->nodes[i], -1);
-        }
-    }
-
-    while (!pending.empty()) {
-        auto const [node, parent_index] = pending.back();
-        pending.pop_back();
-
-        auto const [translation, rotation, scale] = local_transform(*node);
-        auto const index = static_cast<u32>(nodes.size());
-        indices[node] = index;
-        nodes.push_back({
-            .name = node->name != nullptr ? node->name : std::format("Node_{}", index),
-            .parent_index = parent_index,
-            .translation = translation,
-            .rotation = rotation,
-            .scale = scale });
-
-        for (cgltf_size i = node->children_count; i-- > 0;) {
-            pending.emplace_back(node->children[i], static_cast<i32>(index));
-        }
-    }
-
-    return { std::move(nodes), std::move(indices) };
-}
-
-auto import_skeleton(cgltf_data const* data, std::string_view file_name) -> std::optional<SkeletonData>
+auto import_skeleton(cgltf_data const* data, std::string_view file_name) -> std::optional<Graphics::SkeletonData>
 {
     if (data->skins_count == 0) {
         return std::nullopt;
@@ -83,13 +25,13 @@ auto import_skeleton(cgltf_data const* data, std::string_view file_name) -> std:
     }
 
     auto const& skin = data->skins[0];
-    auto [nodes, indices] = flatten_node_hierarchy(data);
+    auto [nodes, indices] = glTF::flatten_node_hierarchy(data);
     if (nodes.size() != data->nodes_count) {
         OA_LOG_WARN(Log::Model, "{}: reached {} of {} nodes, the hierarchy has a cycle", file_name, nodes.size(), data->nodes_count);
         return std::nullopt;
     }
 
-    SkeletonData skeleton;
+    Graphics::SkeletonData skeleton;
     skeleton.nodes = std::move(nodes);
     skeleton.bone_nodes.reserve(skin.joints_count);
     skeleton.inverse_bind_matrices.reserve(skin.joints_count);
@@ -142,28 +84,27 @@ auto ModelImporter::supported_extensions() -> std::vector<std::string>
     return { ".gltf" };
 }
 
+auto ModelImporter::enumerate_sub_assets(std::filesystem::path const& path) -> Common::Expected<std::vector<SubAssetDescriptor>>
+{
+    auto const gltf = TRY(glTF::parse(path));
+
+    std::vector<SubAssetDescriptor> descriptors;
+    descriptors.reserve(gltf->animations_count);
+    for (cgltf_size index = 0; index < gltf->animations_count; ++index) {
+        descriptors.push_back({ .name = glTF::clip_name(gltf->animations[index], index), .type = AssetType::Animation });
+    }
+    return descriptors;
+}
+
 auto ModelImporter::import_gltf(ImportContext const& context) -> Common::Expected<ModelData>
 {
     auto const& path = context.path;
     auto const* asset_registry = context.registry;
-    auto const file_data = TRY(File::read_all(path));
-
-    cgltf_options const options {};
-    cgltf_data* data = nullptr;
-    if (cgltf_parse(&options, file_data.data(), file_data.size(), &data) != cgltf_result_success) {
-        return OA_ERROR("Failed to parse glTF file '{}'", path.string());
-    }
-    if (cgltf_load_buffers(&options, data, path.string().c_str()) != cgltf_result_success) {
-        cgltf_free(data);
-        return OA_ERROR("Failed to load buffers for glTF file '{}'", path.string());
-    }
-    if (cgltf_validate(data) != cgltf_result_success) {
-        cgltf_free(data);
-        return OA_ERROR("Invalid glTF file '{}'", path.string());
-    }
+    auto const gltf = TRY(glTF::load(path));
+    auto const* data = gltf.get();
 
     Time::Stopwatch const stopwatch;
-    OA_LOG_TRACE(Log::Model, "Importing {}: {} bytes, {} meshes, {} materials", path.filename().string(), file_data.size(), data->meshes_count, data->materials_count);
+    OA_LOG_TRACE(Log::Model, "Importing {}: {} meshes, {} materials", path.filename().string(), data->meshes_count, data->materials_count);
 
     ModelData model_data;
     model_data.skeleton = import_skeleton(data, path.filename().string());
@@ -405,8 +346,7 @@ auto ModelImporter::import_gltf(ImportContext const& context) -> Common::Expecte
                     }
 
                     auto const& vertex = sub_mesh.vertices[vertex_index];
-                    sub_mesh.skinned_vertices.push_back({
-                        .position = vertex.position,
+                    sub_mesh.skinned_vertices.push_back({ .position = vertex.position,
                         .tex_coord = vertex.tex_coord,
                         .normal = vertex.normal,
                         .tangent = vertex.tangent,
@@ -425,7 +365,6 @@ auto ModelImporter::import_gltf(ImportContext const& context) -> Common::Expecte
     });
 
     OA_LOG_DEBUG(Log::Model, "Imported {}: {} sub meshes, {} materials, {:.1f}ms", path.filename().string(), model_data.sub_meshes.size(), model_data.materials.size(), stopwatch.elapsed_milliseconds());
-    cgltf_free(data);
     return model_data;
 }
 

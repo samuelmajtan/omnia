@@ -43,6 +43,20 @@ struct MaterialParameters {
     f32 occlusion_strength = 1.0F;
 };
 
+struct SkeletonNode {
+    std::string name;
+    i32 parent_index = -1;
+    Math::Vec3f translation {};
+    Math::Quatf rotation {};
+    Math::Vec3f scale { 1.0F, 1.0F, 1.0F };
+};
+
+struct SkeletonData {
+    std::vector<SkeletonNode> nodes;
+    std::vector<u32> bone_nodes;
+    std::vector<Math::Mat4f> inverse_bind_matrices;
+};
+
 struct SubMeshData {
     std::vector<Vertex> vertices;
     std::vector<SkinnedVertex> skinned_vertices;

@@ -370,9 +370,9 @@ auto make_skinned_vertex(f32 seed, Math::Vec4u bone_indices) -> Graphics::Skinne
     };
 }
 
-auto make_skeleton() -> Asset::SkeletonData
+auto make_skeleton() -> Graphics::SkeletonData
 {
-    Asset::SkeletonData skeleton;
+    Graphics::SkeletonData skeleton;
     skeleton.nodes = {
         { .name = "root", .parent_index = -1, .translation = { 0.0F, 1.0F, 0.0F }, .rotation = Math::Quatf::identity(), .scale = { 1.0F, 1.0F, 1.0F } },
         { .name = "pelvis", .parent_index = 0, .translation = { 0.0F, 2.0F, 0.0F }, .rotation = Math::Quatf::from_axis_angle({ 0.0F, 0.0F, 1.0F }, DEG_TO_RAD(30.0F)), .scale = { 1.0F, 1.0F, 1.0F } },
@@ -505,4 +505,103 @@ TEST(AssetTraits, SubMeshHoldingBothVertexKindsIsRejected)
 
     auto const result = round_trip(model);
     EXPECT_FALSE(result.has_value());
+}
+
+namespace {
+
+auto make_animation() -> Asset::AnimationData
+{
+    return Asset::AnimationData {
+        .name = "March",
+        .duration = 1.5F,
+        .channels = {
+            { .node_index = 3,
+                .path = Asset::AnimationPath::Translation,
+                .interpolation = Asset::AnimationInterpolation::Linear,
+                .times = { 0.0F, 0.75F, 1.5F },
+                .values = { 0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F, 2.0F, 0.0F } },
+            { .node_index = 7,
+                .path = Asset::AnimationPath::Rotation,
+                .interpolation = Asset::AnimationInterpolation::Step,
+                .times = { 0.0F, 1.5F },
+                .values = { 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.7071F, 0.0F, 0.7071F } },
+        }
+    };
+}
+
+}
+
+TEST(AssetTraits, AnimationComponentCountFollowsThePath)
+{
+    EXPECT_EQ(Asset::components_for(Asset::AnimationPath::Translation), 3U);
+    EXPECT_EQ(Asset::components_for(Asset::AnimationPath::Scale), 3U);
+    EXPECT_EQ(Asset::components_for(Asset::AnimationPath::Rotation), 4U);
+}
+
+TEST(SerializeAnimation, RoundTrips)
+{
+    auto const original = make_animation();
+    auto const result = round_trip(original);
+
+    ASSERT_TRUE(result.has_value()) << result.error();
+    auto const& actual = result.value();
+
+    EXPECT_EQ(actual.name, original.name);
+    EXPECT_EQ(actual.duration, original.duration);
+    ASSERT_EQ(actual.channels.size(), original.channels.size());
+
+    for (std::size_t index = 0; index < actual.channels.size(); ++index) {
+        EXPECT_EQ(actual.channels[index].node_index, original.channels[index].node_index);
+        EXPECT_EQ(actual.channels[index].path, original.channels[index].path);
+        EXPECT_EQ(actual.channels[index].interpolation, original.channels[index].interpolation);
+        EXPECT_TRUE(same_bytes(actual.channels[index].times, original.channels[index].times));
+        EXPECT_TRUE(same_bytes(actual.channels[index].values, original.channels[index].values));
+    }
+}
+
+TEST(SerializeAnimation, EmptyClipRoundTrips)
+{
+    auto const result = round_trip(Asset::AnimationData { .name = "Empty", .duration = 0.0F, .channels = {} });
+
+    ASSERT_TRUE(result.has_value()) << result.error();
+    EXPECT_TRUE(result.value().channels.empty());
+}
+
+TEST(SerializeAnimation, ChannelWithTheWrongValueCountIsRejected)
+{
+    auto animation = make_animation();
+    animation.channels[0].values.pop_back();
+
+    EXPECT_FALSE(round_trip(animation).has_value());
+}
+
+TEST(SerializeAnimation, UnsortedKeyframeTimesAreRejected)
+{
+    auto animation = make_animation();
+    std::ranges::reverse(animation.channels[0].times);
+
+    EXPECT_FALSE(round_trip(animation).has_value());
+}
+
+TEST(SerializeAnimation, InvalidPathEnumIsRejected)
+{
+    Binary::ByteWriter writer;
+    writer.write_string("Broken");
+    writer.write<f32>(1.0F);
+    writer.write<u64>(1);
+    writer.write<u32>(0);
+    writer.write<u8>(static_cast<u8>(Asset::AnimationPath::Count));
+    writer.write<u8>(static_cast<u8>(Asset::AnimationInterpolation::Linear));
+
+    Binary::ByteReader reader(writer.bytes());
+    EXPECT_FALSE(Asset::AssetTraits<Asset::AnimationData>::read(reader).has_value());
+}
+
+TEST(SerializeAnimation, TruncatedPayloadIsRejected)
+{
+    Binary::ByteWriter writer;
+    Asset::AssetTraits<Asset::AnimationData>::write(writer, make_animation());
+
+    Binary::ByteReader reader(writer.bytes().first(writer.size() - 6));
+    EXPECT_FALSE(Asset::AssetTraits<Asset::AnimationData>::read(reader).has_value());
 }

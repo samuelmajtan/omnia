@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+#include <algorithm>
 #include <format>
 
 #include <Common/Expected.h>
@@ -26,6 +27,11 @@ auto AssetTraits<ShaderData>::source_hash(ImportContext const& context) -> Commo
     return Importer::source_hash(context);
 }
 
+auto AssetTraits<ShaderData>::enumerate_sub_assets(std::filesystem::path const&) -> Common::Expected<std::vector<SubAssetDescriptor>>
+{
+    return std::vector<SubAssetDescriptor> {};
+}
+
 auto AssetTraits<TextureData>::extensions() -> std::vector<std::string>
 {
     return Importer::supported_extensions();
@@ -39,6 +45,11 @@ auto AssetTraits<TextureData>::import(ImportContext const& context) -> Common::E
 auto AssetTraits<TextureData>::source_hash(ImportContext const& context) -> Common::Expected<u64>
 {
     return Importer::source_hash(context);
+}
+
+auto AssetTraits<TextureData>::enumerate_sub_assets(std::filesystem::path const&) -> Common::Expected<std::vector<SubAssetDescriptor>>
+{
+    return std::vector<SubAssetDescriptor> {};
 }
 
 auto AssetTraits<ModelData>::extensions() -> std::vector<std::string>
@@ -56,9 +67,35 @@ auto AssetTraits<ModelData>::source_hash(ImportContext const& context) -> Common
     return Importer::source_hash(context);
 }
 
+auto AssetTraits<ModelData>::enumerate_sub_assets(std::filesystem::path const& path) -> Common::Expected<std::vector<SubAssetDescriptor>>
+{
+    return Importer::enumerate_sub_assets(path);
+}
+
+auto AssetTraits<AnimationData>::extensions() -> std::vector<std::string>
+{
+    return Importer::supported_extensions();
+}
+
+auto AssetTraits<AnimationData>::import(ImportContext const& context) -> Common::Expected<AnimationData>
+{
+    return Importer::import(context);
+}
+
+auto AssetTraits<AnimationData>::source_hash(ImportContext const& context) -> Common::Expected<u64>
+{
+    return Importer::source_hash(context);
+}
+
+auto AssetTraits<AnimationData>::enumerate_sub_assets(std::filesystem::path const&) -> Common::Expected<std::vector<SubAssetDescriptor>>
+{
+    return std::vector<SubAssetDescriptor> {};
+}
+
 static_assert(AssetData<ShaderData>);
 static_assert(AssetData<TextureData>);
 static_assert(AssetData<ModelData>);
+static_assert(AssetData<AnimationData>);
 
 // -- Shaders ------------------------------------------------------------------
 
@@ -200,12 +237,12 @@ auto AssetTraits<ModelData>::read(Binary::ByteReader& reader) -> Common::Expecte
     }
 
     if (TRY(reader.read<u8>()) != 0) {
-        SkeletonData skeleton;
+        Graphics::SkeletonData skeleton;
 
         auto const node_count = TRY(reader.read<u64>());
         skeleton.nodes.reserve(node_count);
         for (u64 index = 0; index < node_count; ++index) {
-            SkeletonNode node;
+            Graphics::SkeletonNode node;
             node.name = TRY(reader.read_string());
             node.parent_index = TRY(reader.read<i32>());
             node.translation = TRY(reader.read<Math::Vec3f>());
@@ -250,6 +287,88 @@ auto AssetTraits<ModelData>::read(Binary::ByteReader& reader) -> Common::Expecte
     }
 
     return data;
+}
+
+// -- Animations ---------------------------------------------------------------
+
+void AssetTraits<AnimationData>::write(Binary::ByteWriter& writer, AnimationData const& data)
+{
+    writer.write_string(data.name);
+    writer.write(data.duration);
+
+    writer.write(static_cast<u64>(data.channels.size()));
+    for (auto const& channel : data.channels) {
+        writer.write(channel.node_index);
+        writer.write(static_cast<u8>(channel.path));
+        writer.write(static_cast<u8>(channel.interpolation));
+        writer.write_vector(channel.times);
+        writer.write_vector(channel.values);
+    }
+}
+
+auto AssetTraits<AnimationData>::read(Binary::ByteReader& reader) -> Common::Expected<AnimationData>
+{
+    AnimationData data;
+    data.name = TRY(reader.read_string());
+    data.duration = TRY(reader.read<f32>());
+
+    if (data.duration < 0.0F) {
+        return OA_ERROR("Animation '{}' has a duration of {}", data.name, data.duration);
+    }
+
+    auto const channel_count = TRY(reader.read<u64>());
+    data.channels.reserve(channel_count);
+    for (u64 index = 0; index < channel_count; ++index) {
+        AnimationChannel channel;
+        channel.node_index = TRY(reader.read<u32>());
+        channel.path = TRY(reader.read_enum<AnimationPath>());
+        channel.interpolation = TRY(reader.read_enum<AnimationInterpolation>());
+        channel.times = TRY(reader.read_vector<f32>());
+        channel.values = TRY(reader.read_vector<f32>());
+
+        auto const components = components_for(channel.path);
+        if (channel.values.size() != channel.times.size() * components) {
+            return OA_ERROR("Animation '{}' has a channel with {} keyframe times but {} values, expected {} per key",
+                data.name, channel.times.size(), channel.values.size(), components);
+        }
+        if (!std::ranges::is_sorted(channel.times)) {
+            return OA_ERROR("Animation '{}' has a channel whose keyframe times are not ascending", data.name);
+        }
+        data.channels.push_back(std::move(channel));
+    }
+
+    return data;
+}
+
+auto asset_type_for(std::filesystem::path const& path) -> std::optional<AssetType>
+{
+    if (claims_extension(path, AssetTraits<ModelData>::extensions())) {
+        return AssetTraits<ModelData>::TYPE;
+    }
+    if (claims_extension(path, AssetTraits<TextureData>::extensions())) {
+        return AssetTraits<TextureData>::TYPE;
+    }
+    if (claims_extension(path, AssetTraits<ShaderData>::extensions())) {
+        return AssetTraits<ShaderData>::TYPE;
+    }
+    return std::nullopt;
+}
+
+auto sub_assets_for(AssetType type, std::filesystem::path const& path) -> Common::Expected<std::vector<SubAssetDescriptor>>
+{
+    switch (type) {
+    case AssetType::Model:
+        return AssetTraits<ModelData>::enumerate_sub_assets(path);
+    case AssetType::Texture:
+        return AssetTraits<TextureData>::enumerate_sub_assets(path);
+    case AssetType::Shader:
+        return AssetTraits<ShaderData>::enumerate_sub_assets(path);
+    case AssetType::Animation:
+        return AssetTraits<AnimationData>::enumerate_sub_assets(path);
+    case AssetType::Count:
+        break;
+    }
+    return std::vector<SubAssetDescriptor> {};
 }
 
 }

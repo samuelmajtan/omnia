@@ -1,9 +1,11 @@
 set(SOURCES
+        AnimationImporter.cpp
         AssetFile.cpp
         AssetManager.cpp
         AssetRegistry.cpp
         AssetSidecar.cpp
         AssetTraits.cpp
+        glTF.cpp
         ModelImporter.cpp
         ShaderCompiler.cpp
         ShaderImporter.cpp

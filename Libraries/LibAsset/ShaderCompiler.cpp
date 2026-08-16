@@ -22,6 +22,8 @@ static auto to_shaderc(Graphics::ShaderStage stage) -> shaderc_shader_kind
         return shaderc_vertex_shader;
     case ShaderStage::Fragment:
         return shaderc_fragment_shader;
+    case ShaderStage::Count:
+        break;
     }
     return shaderc_glsl_infer_from_source;
 }

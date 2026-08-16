@@ -86,7 +86,7 @@ public:
     struct PushConstant {
         u32 size;
         u32 offset;
-        Graphics::ShaderStage stage;
+        Graphics::ShaderStageMask stage;
     };
 
     struct Configuration {

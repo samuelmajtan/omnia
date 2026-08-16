@@ -191,11 +191,11 @@ auto DeferredRenderer::create_resources(Configuration const& config) -> Common::
     // --- Resource Layouts and Sets --- //
     RHI::ResourceLayout::Configuration const lighting_resource_layout_config {
         .bindings = {
-            { .binding = 0, .type = RHI::ResourceType::Texture, .stage = Graphics::ShaderStage::Fragment }, // Normal
-            { .binding = 1, .type = RHI::ResourceType::Texture, .stage = Graphics::ShaderStage::Fragment }, // Albedo
-            { .binding = 2, .type = RHI::ResourceType::Texture, .stage = Graphics::ShaderStage::Fragment }, // Material
-            { .binding = 3, .type = RHI::ResourceType::Texture, .stage = Graphics::ShaderStage::Fragment }, // Emissive
-            { .binding = 4, .type = RHI::ResourceType::Texture, .stage = Graphics::ShaderStage::Fragment }, // Depth
+            { .binding = 0, .type = RHI::ResourceType::Texture, .stage = Graphics::ShaderStageMask::Fragment }, // Normal
+            { .binding = 1, .type = RHI::ResourceType::Texture, .stage = Graphics::ShaderStageMask::Fragment }, // Albedo
+            { .binding = 2, .type = RHI::ResourceType::Texture, .stage = Graphics::ShaderStageMask::Fragment }, // Material
+            { .binding = 3, .type = RHI::ResourceType::Texture, .stage = Graphics::ShaderStageMask::Fragment }, // Emissive
+            { .binding = 4, .type = RHI::ResourceType::Texture, .stage = Graphics::ShaderStageMask::Fragment }, // Depth
         }
     };
     m_lighting_resource_layout = TRY(config.device->create_resource_layout(lighting_resource_layout_config));
@@ -222,8 +222,8 @@ auto DeferredRenderer::create_resources(Configuration const& config) -> Common::
 
     RHI::ResourceLayout::Configuration const shadow_resource_layout_config {
         .bindings = {
-            { .binding = 0, .type = RHI::ResourceType::Sampler, .stage = Graphics::ShaderStage::Fragment },
-            { .binding = 1, .type = RHI::ResourceType::Texture, .stage = Graphics::ShaderStage::Fragment }
+            { .binding = 0, .type = RHI::ResourceType::Sampler, .stage = Graphics::ShaderStageMask::Fragment },
+            { .binding = 1, .type = RHI::ResourceType::Texture, .stage = Graphics::ShaderStageMask::Fragment }
         }
     };
     m_shadow_resource_layout = TRY(config.device->create_resource_layout(shadow_resource_layout_config));
@@ -246,12 +246,12 @@ auto DeferredRenderer::create_resources(Configuration const& config) -> Common::
             {
                 .binding = 0,
                 .type = RHI::ResourceType::Sampler,
-                .stage = Graphics::ShaderStage::Fragment
+                .stage = Graphics::ShaderStageMask::Fragment
             },
             {
                 .binding = 1,
                 .type = RHI::ResourceType::UniformBuffer,
-                .stage = Graphics::ShaderStage::Vertex | Graphics::ShaderStage::Fragment
+                .stage = Graphics::ShaderStageMask::Vertex | Graphics::ShaderStageMask::Fragment
             }
         }
     };
@@ -282,7 +282,7 @@ auto DeferredRenderer::create_resources(Configuration const& config) -> Common::
     m_model_push_constant = {
         .size = sizeof(Math::Mat4f),
         .offset = 0,
-        .stage = Graphics::ShaderStage::Vertex
+        .stage = Graphics::ShaderStageMask::Vertex
     };
 
     return {};

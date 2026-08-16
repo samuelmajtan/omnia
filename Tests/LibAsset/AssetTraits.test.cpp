@@ -93,7 +93,7 @@ TEST(SerializeShader, NoVariantsRoundTrips)
 
 TEST(SerializeShader, InvalidStageIsRejected)
 {
-    for (u8 const stage : { 0, 3, 200 }) {
+    for (u8 const stage : { static_cast<int>(Graphics::ShaderStage::Count), 3, 200 }) {
         Binary::ByteWriter writer;
         writer.write<u8>(stage);
         writer.write<u64>(0);

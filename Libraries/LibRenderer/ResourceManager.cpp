@@ -25,7 +25,7 @@ auto ResourceManager::create(Asset::AssetManager const* asset_manager, RHI::Devi
             {
                 .binding = 0,
                 .type = RHI::ResourceType::UniformBuffer,
-                .stage = Graphics::ShaderStage::Fragment
+                .stage = Graphics::ShaderStageMask::Fragment
             },
         }
     };
@@ -36,7 +36,7 @@ auto ResourceManager::create(Asset::AssetManager const* asset_manager, RHI::Devi
             {
                 .binding = i,
                 .type = RHI::ResourceType::Texture,
-                .stage = Graphics::ShaderStage::Fragment
+                .stage = Graphics::ShaderStageMask::Fragment
             }
         );
     }

@@ -35,19 +35,30 @@ struct ShaderData {
     std::vector<ShaderVariant> variants;
 };
 
-static constexpr auto operator|(ShaderStage lhs, ShaderStage rhs) -> ShaderStage
+enum class ShaderStageMask : u8 {
+    None = 0,
+    Vertex = 1 << static_cast<u8>(ShaderStage::Vertex),
+    Fragment = 1 << static_cast<u8>(ShaderStage::Fragment)
+};
+
+static constexpr auto to_mask(ShaderStage stage) -> ShaderStageMask
 {
-    return static_cast<ShaderStage>(static_cast<u8>(lhs) | static_cast<u8>(rhs));
+    return static_cast<ShaderStageMask>(1 << static_cast<u8>(stage));
 }
 
-static constexpr auto operator&(ShaderStage lhs, ShaderStage rhs) -> ShaderStage
+static constexpr auto operator|(ShaderStageMask lhs, ShaderStageMask rhs) -> ShaderStageMask
 {
-    return static_cast<ShaderStage>(static_cast<u8>(lhs) & static_cast<u8>(rhs));
+    return static_cast<ShaderStageMask>(static_cast<u8>(lhs) | static_cast<u8>(rhs));
 }
 
-static constexpr auto any(ShaderStage stage) -> bool
+static constexpr auto operator&(ShaderStageMask lhs, ShaderStageMask rhs) -> ShaderStageMask
 {
-    return static_cast<u8>(stage) != 0;
+    return static_cast<ShaderStageMask>(static_cast<u8>(lhs) & static_cast<u8>(rhs));
+}
+
+static constexpr auto any(ShaderStageMask stages) -> bool
+{
+    return static_cast<u8>(stages) != 0;
 }
 
 }

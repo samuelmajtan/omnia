@@ -9,6 +9,7 @@
 #include <array>
 #include <cassert>
 #include <cmath>
+#include <tuple>
 
 #include <Common/Types.h>
 #include <LibMath/Quat.h>
@@ -227,6 +228,57 @@ public:
     static constexpr auto from_trs(Vec3<T> const& translation, Quat<T> const& rotation, Vec3<T> const& scale) -> Mat4<T>
     {
         return Mat4<T>::translation(translation) * from_quaternion(rotation) * Mat4<T>::scale(scale);
+    }
+
+    constexpr auto to_quaternion() const -> Quat<T>
+    {
+        auto const trace = at(0, 0) + at(1, 1) + at(2, 2);
+        if (trace > 0) {
+            auto const s = std::sqrt(trace + 1) * 2;
+            return Quat<T>((at(2, 1) - at(1, 2)) / s, (at(0, 2) - at(2, 0)) / s, (at(1, 0) - at(0, 1)) / s, s / 4);
+        }
+        if (at(0, 0) > at(1, 1) && at(0, 0) > at(2, 2)) {
+            auto const s = std::sqrt(1 + at(0, 0) - at(1, 1) - at(2, 2)) * 2;
+            return Quat<T>(s / 4, (at(0, 1) + at(1, 0)) / s, (at(0, 2) + at(2, 0)) / s, (at(2, 1) - at(1, 2)) / s);
+        }
+        if (at(1, 1) > at(2, 2)) {
+            auto const s = std::sqrt(1 + at(1, 1) - at(0, 0) - at(2, 2)) * 2;
+            return Quat<T>((at(0, 1) + at(1, 0)) / s, s / 4, (at(1, 2) + at(2, 1)) / s, (at(0, 2) - at(2, 0)) / s);
+        }
+        auto const s = std::sqrt(1 + at(2, 2) - at(0, 0) - at(1, 1)) * 2;
+        return Quat<T>((at(0, 2) + at(2, 0)) / s, (at(1, 2) + at(2, 1)) / s, s / 4, (at(1, 0) - at(0, 1)) / s);
+    }
+
+    constexpr auto decompose() const -> std::tuple<Vec3<T>, Quat<T>, Vec3<T>>
+    {
+        Vec3<T> const x { at(0, 0), at(1, 0), at(2, 0) };
+        Vec3<T> const y { at(0, 1), at(1, 1), at(2, 1) };
+        Vec3<T> const z { at(0, 2), at(1, 2), at(2, 2) };
+
+        Vec3<T> scale { x.length(), y.length(), z.length() };
+        if (dot(cross(x, y), z) < 0) {
+            scale.x = -scale.x;
+        }
+
+        Mat4<T> basis = identity();
+        auto const unscale = [](Vec3<T> const& axis, T factor) {
+            return factor == 0 ? Vec3<T> {} : axis / factor;
+        };
+        auto const nx = unscale(x, scale.x);
+        auto const ny = unscale(y, scale.y);
+        auto const nz = unscale(z, scale.z);
+
+        basis.at(0, 0) = nx.x;
+        basis.at(1, 0) = nx.y;
+        basis.at(2, 0) = nx.z;
+        basis.at(0, 1) = ny.x;
+        basis.at(1, 1) = ny.y;
+        basis.at(2, 1) = ny.z;
+        basis.at(0, 2) = nz.x;
+        basis.at(1, 2) = nz.y;
+        basis.at(2, 2) = nz.z;
+
+        return { Vec3<T> { at(0, 3), at(1, 3), at(2, 3) }, basis.to_quaternion().normalized(), scale };
     }
 private:
     std::array<T, 16> m_elements {};

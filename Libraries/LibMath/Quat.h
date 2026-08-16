@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <cmath>
 
 #include <Common/Types.h>
@@ -56,6 +57,26 @@ public:
             (w * other.w) - (x * other.x) - (y * other.y) - (z * other.z));
     }
 
+    constexpr auto operator*(T scalar) const -> Quat
+    {
+        return Quat(x * scalar, y * scalar, z * scalar, w * scalar);
+    }
+
+    constexpr auto operator+(Quat const& other) const -> Quat
+    {
+        return Quat(x + other.x, y + other.y, z + other.z, w + other.w);
+    }
+
+    constexpr auto operator-(Quat const& other) const -> Quat
+    {
+        return Quat(x - other.x, y - other.y, z - other.z, w - other.w);
+    }
+
+    constexpr auto operator-() const -> Quat
+    {
+        return Quat(-x, -y, -z, -w);
+    }
+
     constexpr auto operator==(Quat const& other) const -> bool
     {
         return x == other.x && y == other.y && z == other.z && w == other.w;
@@ -64,6 +85,17 @@ public:
     constexpr auto conjugate() const -> Quat
     {
         return Quat(-x, -y, -z, w);
+    }
+
+    constexpr auto inverse() const -> Quat
+    {
+        auto const length_squared = (x * x) + (y * y) + (z * z) + (w * w);
+        if (length_squared == 0) {
+            return Quat(0, 0, 0, 1);
+        }
+
+        auto const inverted_length_squared = 1.0F / length_squared;
+        return Quat(-x * inverted_length_squared, -y * inverted_length_squared, -z * inverted_length_squared, w * inverted_length_squared);
     }
 
     constexpr auto length() const -> T
@@ -124,6 +156,41 @@ public:
             cos_half_theta);
     }
 };
+
+template<typename T>
+constexpr auto dot(Quat<T> const& a, Quat<T> const& b) -> T
+{
+    return (a.x * b.x) + (a.y * b.y) + (a.z * b.z) + (a.w * b.w);
+}
+
+template<typename T>
+constexpr auto nlerp(Quat<T> const& from, Quat<T> const& to, T t) -> Quat<T>
+{
+    auto const end = dot(from, to) < 0 ? -to : to;
+    return (from + ((end - from) * t)).normalized();
+}
+
+template<typename T>
+constexpr auto slerp(Quat<T> const& from, Quat<T> const& to, T t) -> Quat<T>
+{
+    auto cos_theta = std::clamp(dot(from, to), static_cast<T>(-1), static_cast<T>(1));
+    auto end = to;
+    if (cos_theta < 0) {
+        end = -end;
+        cos_theta = -cos_theta;
+    }
+
+    constexpr auto SLERP_LINEAR_THRESHOLD = static_cast<T>(0.9995);
+    if (cos_theta > SLERP_LINEAR_THRESHOLD) {
+        return nlerp(from, end, t);
+    }
+
+    auto const theta = std::acos(cos_theta);
+    auto const sin_theta = std::sin(theta);
+    auto const from_scale = std::sin((1 - t) * theta) / sin_theta;
+    auto const end_scale = std::sin(t * theta) / sin_theta;
+    return (from * from_scale) + (end * end_scale);
+}
 
 using Quatf = Quat<f32>;
 using Quatd = Quat<f64>;

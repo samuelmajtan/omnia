@@ -223,6 +223,11 @@ public:
         result.at(3, 3) = 1;
         return result;
     }
+
+    static constexpr auto from_trs(Vec3<T> const& translation, Quat<T> const& rotation, Vec3<T> const& scale) -> Mat4<T>
+    {
+        return Mat4<T>::translation(translation) * from_quaternion(rotation) * Mat4<T>::scale(scale);
+    }
 private:
     std::array<T, 16> m_elements {};
 };

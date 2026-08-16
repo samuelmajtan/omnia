@@ -242,3 +242,41 @@ TEST(Mat4, TranslateMatchesMultiplication)
         EXPECT_NEAR(translated[i], multiplied[i], 1e-5F) << "element " << i;
     }
 }
+
+TEST(Mat4, FromTrsComposesInTranslateRotateScaleOrder)
+{
+    Math::Vec3f const translation { 1.0F, -2.0F, 3.0F };
+    auto const rotation = Math::Quatf::from_axis_angle({ 0.0F, 0.0F, 1.0F }, DEG_TO_RAD(90.0F));
+    Math::Vec3f const scale { 2.0F, 3.0F, 4.0F };
+
+    auto const composed = Math::Mat4f::from_trs(translation, rotation, scale);
+    auto const expected = Math::Mat4f::translation(translation)
+        * Math::Mat4f::from_quaternion(rotation)
+        * Math::Mat4f::scale(scale);
+
+    for (size_t i = 0; i < 16; ++i) {
+        EXPECT_NEAR(composed[i], expected[i], 1e-5F) << "element " << i;
+    }
+}
+
+TEST(Mat4, FromTrsScalesBeforeRotatingAndTranslating)
+{
+    Math::Vec3f const translation { 10.0F, 0.0F, 0.0F };
+    auto const rotation = Math::Quatf::from_axis_angle({ 0.0F, 0.0F, 1.0F }, DEG_TO_RAD(90.0F));
+    Math::Vec3f const scale { 2.0F, 1.0F, 1.0F };
+
+    auto const point = Math::Mat4f::from_trs(translation, rotation, scale) * Math::Vec4f({ 1.0F, 0.0F, 0.0F }, 1.0F);
+
+    EXPECT_NEAR(point.x, 10.0F, 1e-5F);
+    EXPECT_NEAR(point.y, 2.0F, 1e-5F);
+    EXPECT_NEAR(point.z, 0.0F, 1e-5F);
+}
+
+TEST(Mat4, FromTrsIdentityInputsGiveIdentity)
+{
+    auto const identity = Math::Mat4f::from_trs({ 0.0F, 0.0F, 0.0F }, Math::Quatf::identity(), { 1.0F, 1.0F, 1.0F });
+
+    for (size_t i = 0; i < 16; ++i) {
+        EXPECT_NEAR(identity[i], Math::Mat4f::identity()[i], 1e-6F) << "element " << i;
+    }
+}

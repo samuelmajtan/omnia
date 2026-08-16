@@ -34,6 +34,7 @@ class Renderer {
 public:
     struct SubmitInfo {
         FrameData frame_data;
+        u32 frame_index {};
         RHI::RenderTarget const* output_render_target {};
         RHI::CommandBuffer* command_buffer {};
         std::span<RenderItem const> render_items;

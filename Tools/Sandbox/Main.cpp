@@ -61,6 +61,7 @@ public:
         Renderer::DeferredRenderer::Configuration const deferred_renderer_config {
             .render_target_width = swapchain_config.width,
             .render_target_height = swapchain_config.height,
+            .frames_in_flight = swapchain_config.frames_in_flight,
             .render_target_format = sandbox->m_swapchain->format(),
             .device = sandbox->m_graphics_device.get(),
             .resource_manager = sandbox->m_resource_manager.get(),
@@ -203,6 +204,7 @@ public:
             };
             Renderer::DeferredRenderer::SubmitInfo const submit_info {
                 .frame_data = frame_data,
+                .frame_index = frame_index,
                 .output_render_target = m_swapchain_render_targets[image_index].get(),
                 .command_buffer = cmd,
                 .render_items = render_items

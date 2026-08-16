@@ -45,7 +45,11 @@ void DeferredRenderer::submit(SubmitInfo const& submit_info) const
     auto* cmd = submit_info.command_buffer;
     auto const* render_target = submit_info.output_render_target;
 
-    m_frame_uniform_buffer->set_data(&submit_info.frame_data, sizeof(submit_info.frame_data));
+    assert(submit_info.frame_index < m_frame_uniform_buffers.size());
+    auto const& uniform_buffer = m_frame_uniform_buffers[submit_info.frame_index];
+    auto const& resource_set = m_frame_resource_sets[submit_info.frame_index];
+
+    uniform_buffer->set_data(&submit_info.frame_data, sizeof(submit_info.frame_data));
 
     // --- Shadow Pass --- //
     cmd->begin_render_pass(m_shadow_render_pass.get(), m_shadow_render_target.get());
@@ -53,7 +57,7 @@ void DeferredRenderer::submit(SubmitInfo const& submit_info) const
         cmd->bind_pipeline(m_shadow_pipeline.get());
         cmd->set_viewport(0, 0, m_shadow_map_size, m_shadow_map_size);
         cmd->set_scissor(0, 0, m_shadow_map_size, m_shadow_map_size);
-        cmd->bind_resource_set(0, m_frame_resource_set.get());
+        cmd->bind_resource_set(0, resource_set.get());
 
         for (auto const& render_item : submit_info.render_items) {
             cmd->bind_vertex_buffer(render_item.vertex_buffer);
@@ -70,7 +74,7 @@ void DeferredRenderer::submit(SubmitInfo const& submit_info) const
         cmd->bind_pipeline(m_geometry_pipeline.get());
         cmd->set_viewport(0, 0, m_gbuffer.albedo->width(), m_gbuffer.albedo->height());
         cmd->set_scissor(0, 0, m_gbuffer.albedo->width(), m_gbuffer.albedo->height());
-        cmd->bind_resource_set(0, m_frame_resource_set.get());
+        cmd->bind_resource_set(0, resource_set.get());
 
         for (auto const& render_item : submit_info.render_items) {
             cmd->bind_resource_set(1, render_item.material_resource_set);
@@ -88,7 +92,7 @@ void DeferredRenderer::submit(SubmitInfo const& submit_info) const
         cmd->bind_pipeline(m_lighting_pipeline.get());
         cmd->set_viewport(0, 0, render_target->width(), render_target->height());
         cmd->set_scissor(0, 0, render_target->width(), render_target->height());
-        cmd->bind_resource_set(0, m_frame_resource_set.get());
+        cmd->bind_resource_set(0, resource_set.get());
         cmd->bind_resource_set(1, m_lighting_resource_set.get());
         cmd->bind_resource_set(2, m_shadow_resource_set.get());
         cmd->draw(3, 1, 0, 0);
@@ -232,7 +236,10 @@ auto DeferredRenderer::create_resources(Configuration const& config) -> Common::
         .size = sizeof(FrameData),
         .usage = RHI::BufferUsage::Uniform
     };
-    m_frame_uniform_buffer = TRY(config.device->create_buffer(frame_uniform_buffer_config));
+    m_frame_uniform_buffers.reserve(config.frames_in_flight);
+    for (i32 i = 0; i < config.frames_in_flight; ++i) {
+        m_frame_uniform_buffers.push_back(TRY(config.device->create_buffer(frame_uniform_buffer_config)));
+    }
 
     RHI::ResourceLayout::Configuration const frame_resource_layout_config {
         .bindings = {
@@ -264,9 +271,12 @@ auto DeferredRenderer::create_resources(Configuration const& config) -> Common::
     RHI::ResourceSet::Configuration const frame_resource_set_config {
         .layout = m_frame_resource_layout.get(),
     };
-    m_frame_resource_set = TRY(config.device->create_resource_set(frame_resource_set_config));
-    m_frame_resource_set->set_sampler(0, m_frame_default_sampler.get());
-    m_frame_resource_set->set_uniform_buffer(1, m_frame_uniform_buffer.get());
+    m_frame_resource_sets.reserve(config.frames_in_flight);
+    for (i32 i = 0; i < config.frames_in_flight; ++i) {
+        m_frame_resource_sets.push_back(TRY(config.device->create_resource_set(frame_resource_set_config)));
+        m_frame_resource_sets.back()->set_sampler(0, m_frame_default_sampler.get());
+        m_frame_resource_sets.back()->set_uniform_buffer(1, m_frame_uniform_buffers[i].get());
+    }
 
     // --- Push Constants --- //
     m_model_push_constant = {

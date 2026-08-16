@@ -34,6 +34,7 @@ public:
         u32 render_target_width {};
         u32 render_target_height {};
         u32 shadow_map_size = 4096;
+        i32 frames_in_flight = 2;
         RHI::TextureFormat render_target_format {};
         RHI::Device* device {};
         ResourceManager* resource_manager {};
@@ -82,8 +83,8 @@ private:
     // --- Resources --- //
     RHI::Device* m_device {};
     std::unique_ptr<RHI::ResourceLayout> m_frame_resource_layout;
-    std::unique_ptr<RHI::ResourceSet> m_frame_resource_set;
-    std::unique_ptr<RHI::Buffer> m_frame_uniform_buffer;
+    std::vector<std::unique_ptr<RHI::ResourceSet>> m_frame_resource_sets;
+    std::vector<std::unique_ptr<RHI::Buffer>> m_frame_uniform_buffers;
     std::unique_ptr<RHI::Sampler> m_frame_default_sampler;
     RHI::Pipeline::PushConstant m_model_push_constant {};
 };

@@ -15,6 +15,11 @@ AssetManager::AssetManager(Configuration const& config)
     : m_asset_registry(config.source_root)
     , m_cache_root(config.cache_root.empty() ? default_cache_root(config.source_root) : config.cache_root)
 {
+    if (m_cache_root.empty()) {
+        OA_LOG_WARN(Log::Manager, "No cooked asset cache root could be resolved from '{}'", config.source_root.string());
+        return;
+    }
+    OA_LOG_DEBUG(Log::Manager, "Source root '{}', cooked asset cache '{}'", config.source_root.string(), m_cache_root.string());
 }
 
 AssetManager::AssetManager(std::filesystem::path const& source_root)
@@ -58,6 +63,7 @@ auto AssetManager::load_loose_assets() -> Common::Expected<void>
 
 auto AssetManager::load_packed_assets() -> Common::Expected<void>
 {
+    OA_LOG_DEBUG(Log::Manager, "Packed assets are not implemented yet");
     return {};
 }
 

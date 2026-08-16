@@ -8,7 +8,8 @@
 #include <vector>
 
 #include <Common/Expected.h>
-#include <LibDebug/Logger.h>
+#include <Common/Time.h>
+#include <LibRHI/Log.h>
 
 #define VMA_IMPLEMENTATION
 #include <LibRHI/Vulkan/VkBuffer.h>
@@ -30,8 +31,6 @@
 namespace RHI {
 
 namespace {
-
-constexpr Debug::Logger Logger("Vulkan RHI");
 
 auto to_log_level(VkDebugUtilsMessageSeverityFlagBitsEXT severity) -> Debug::LogLevel
 {
@@ -65,31 +64,39 @@ auto to_string(VkDebugUtilsMessageTypeFlagsEXT message_type) -> std::string_view
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT severity, VkDebugUtilsMessageTypeFlagsEXT message_type, VkDebugUtilsMessengerCallbackDataEXT const* callback_data, [[maybe_unused]] void* user_data)
 {
-    Logger.log(to_log_level(severity), "{}: {}", to_string(message_type), callback_data->pMessage);
+    Log::Validation.log(to_log_level(severity), "{} {}: {}", to_string(message_type),
+        callback_data->pMessageIdName != nullptr ? callback_data->pMessageIdName : "<unnamed>", callback_data->pMessage);
     return VK_FALSE;
 }
 
 auto VkDevice::create(Configuration const& config) -> Common::Expected<std::unique_ptr<VkDevice>>
 {
     std::unique_ptr<VkDevice> device(new VkDevice(config));
+    Time::Stopwatch const stopwatch;
 
     return device->create_instance()
         .and_then([&]() {
+            OA_LOG_TRACE(Log::Device, "Instance created");
             return device->create_surface();
         })
         .and_then([&]() {
+            OA_LOG_TRACE(Log::Device, "Surface created");
             return device->create_logical_device();
         })
         .and_then([&]() {
+            OA_LOG_TRACE(Log::Device, "Logical device created");
             return device->create_allocator();
         })
         .and_then([&]() {
+            OA_LOG_TRACE(Log::Device, "Allocator created");
             return device->create_command_pools();
         })
         .and_then([&]() {
+            OA_LOG_TRACE(Log::Device, "Command pools created");
             return device->create_descriptor_pool();
         })
         .transform([&]() {
+            OA_LOG_DEBUG(Log::Device, "Vulkan device ready in {:.1f}ms", stopwatch.elapsed_milliseconds());
             return std::move(device);
         });
 }
@@ -102,6 +109,8 @@ VkDevice::VkDevice(Configuration const& config)
 
 VkDevice::~VkDevice()
 {
+    OA_LOG_DEBUG(Log::Device, "Destroying the Vulkan device and its {} descriptor pool(s)", m_descriptor_pools.size());
+
     for (auto* descriptor_pool : m_descriptor_pools) {
         vkDestroyDescriptorPool(m_logical_device, descriptor_pool, nullptr);
     }
@@ -137,6 +146,8 @@ auto VkDevice::descriptor_pool() const -> VkDescriptorPool
 auto VkDevice::grow_descriptor_pool() -> Common::Expected<VkDescriptorPool>
 {
     m_descriptor_pool_capacity *= 2;
+    OA_LOG_DEBUG(Log::Device, "Descriptor pool exhausted, allocating a new one with capacity {}", m_descriptor_pool_capacity);
+
     return create_descriptor_pool()
         .transform([&]() {
             return m_descriptor_pools.back();
@@ -174,8 +185,10 @@ void VkDevice::submit_graphics(const RHI::VkCommandBuffer& command_buffer) const
         .pSignalSemaphores = nullptr
     };
 
+    Time::Stopwatch const stopwatch;
     vkQueueSubmit(m_graphics_queue, 1, &submit_info, VK_NULL_HANDLE);
     vkQueueWaitIdle(m_graphics_queue);
+    OA_LOG_TRACE(Log::Device, "Blocking graphics submit stalled for {:.2f}ms", stopwatch.elapsed_milliseconds());
 }
 
 auto VkDevice::graphics_command_buffer() const -> RHI::VkCommandBuffer const&
@@ -272,6 +285,7 @@ auto VkDevice::create_instance() -> Common::Expected<void>
 
         bool validation_layer_found = false;
         for (auto const& layerProperty : available_layers) {
+            OA_LOG_TRACE(Log::Device, "Instance layer available: {}", layerProperty.layerName);
             if (strcmp(layerProperty.layerName, instance_layers[0]) == 0) {
                 validation_layer_found = true;
                 break;
@@ -301,6 +315,9 @@ auto VkDevice::create_instance() -> Common::Expected<void>
         };
 
         auto func = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(vkGetInstanceProcAddr(m_instance, "vkCreateDebugUtilsMessengerEXT"));
+        if (func == nullptr) {
+            return OA_ERROR("Vulkan debug messenger requested but vkCreateDebugUtilsMessengerEXT is not available");
+        }
         if (auto result = func(m_instance, &debugMessengerCreateInfo, nullptr, &m_debug_messenger); result != VK_SUCCESS) {
             return OA_ERROR("Failed to create Vulkan debug messenger: {}", string_VkResult(result));
         }
@@ -352,10 +369,13 @@ auto VkDevice::create_logical_device() -> Common::Expected<void>
         return OA_ERROR("No suitable Vulkan physical devices found");
     }
     m_physical_device = &m_physical_devices.begin()->second;
+    OA_LOG_INFO(Log::Device, "Selected GPU: {} ({} of {} enumerated devices were suitable)", m_physical_device->name(), m_physical_devices.size(), device_count);
 
     std::vector<VkDeviceQueueCreateInfo> queue_create_infos;
     f32 const queue_priority = 1.0F;
     auto const [graphics_index, present_index, transfer_index] = m_physical_device->queue_family_indices();
+
+    OA_LOG_DEBUG(Log::Device, "Queue families: graphics {}, present {}, transfer {}", graphics_index, present_index, transfer_index);
 
     queue_create_infos.push_back({ .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
         .pNext = nullptr,
@@ -404,6 +424,8 @@ auto VkDevice::create_logical_device() -> Common::Expected<void>
     vkGetDeviceQueue(m_logical_device, graphics_index, 0, &m_graphics_queue);
     vkGetDeviceQueue(m_logical_device, present_index, 0, &m_present_queue);
     vkGetDeviceQueue(m_logical_device, transfer_index, 0, &m_transfer_queue);
+
+    OA_LOG_TRACE(Log::Device, "Logical device created with {} queues and {} extension(s)", queue_create_infos.size(), required_extensions.size());
     return {};
 }
 
@@ -478,6 +500,8 @@ auto VkDevice::create_descriptor_pool() -> Common::Expected<void>
         return OA_ERROR("Failed to create descriptor pool: {}", string_VkResult(result));
     }
     m_descriptor_pools.push_back(descriptor_pool);
+
+    OA_LOG_DEBUG(Log::Device, "Descriptor pool {} created with capacity {}", m_descriptor_pools.size() - 1, m_descriptor_pool_capacity);
     return {};
 }
 

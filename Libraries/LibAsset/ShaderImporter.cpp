@@ -11,15 +11,14 @@
 #include <Common/File.h>
 #include <Common/Hash.h>
 #include <Common/String.h>
+#include <Common/Time.h>
+#include <LibAsset/Log.h>
 #include <LibAsset/ShaderCompiler.h>
 #include <LibAsset/ShaderImporter.h>
-#include <LibDebug/Logger.h>
 
 namespace Asset {
 
 namespace {
-
-constexpr Debug::Logger Logger("Shader Importer");
 
 // Extract the path of included file from a line, TODO: Seems like this is not very robust, use a regex?
 auto included_path(std::string_view line) -> std::optional<std::string_view>
@@ -46,7 +45,7 @@ void collect_includes(std::filesystem::path const& base, std::filesystem::path c
 {
     auto const lines = File::read_lines(file);
     if (!lines.has_value()) {
-        Logger.warn("Ignoring {} while hashing shader includes: {}", file.string(), lines.error());
+        OA_LOG_WARN(Log::Shader, "Ignoring {} while hashing shader includes: {}", file.string(), lines.error());
         return;
     }
 
@@ -59,12 +58,14 @@ void collect_includes(std::filesystem::path const& base, std::filesystem::path c
         auto resolved = (base / target.value()).lexically_normal();
         std::error_code error;
         if (!std::filesystem::exists(resolved, error) || error) {
-            Logger.warn("Ignoring include '{}' of {}: it does not exist, so changes to it will not invalidate the cooked shader", target.value(), file.string());
+            OA_LOG_WARN(Log::Shader, "Ignoring include '{}' of {}: file does not exist", target.value(), file.string());
             continue;
         }
 
         if (visited.insert(resolved).second) {
             collect_includes(base, resolved, visited);
+        } else {
+            OA_LOG_TRACE(Log::Shader, "Already visited include {}", resolved.string());
         }
     }
 }
@@ -98,7 +99,11 @@ auto ShaderImporter::import(ImportContext const& context) -> Common::Expected<Sh
 
     auto const file_content = TRY(File::read_all(path));
 
+    Time::Stopwatch const stopwatch;
     auto spirv_bytecode = TRY(ShaderCompiler::compile_spirv(path, file_content, shader_stage));
+    OA_LOG_DEBUG(Log::Shader, "{}: {} bytes of {} GLSL -> {} bytes of SPIR-V, {:.1f}ms",
+        path.filename().string(), file_content.size(), shader_stage_string, spirv_bytecode.size(), stopwatch.elapsed_milliseconds());
+
     shader_data.variants.emplace_back(Graphics::ShaderFormat::SPIRV, std::move(spirv_bytecode));
 
     return shader_data;

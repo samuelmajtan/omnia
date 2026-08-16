@@ -132,7 +132,7 @@ auto Logger::file_path() -> std::filesystem::path
 void Logger::dispatch(LogLevel level, std::string_view component, std::string_view message)
 {
     auto const timestamp = Time::format_log(Time::now());
-    auto const line = std::format("[{}] [{} - {}]: {}\n", timestamp, component, to_string(level), message);
+    auto const line = std::format("[{}] [{}] [{}]: {}\n", timestamp, component, to_string(level), message);
 
     auto const to_standard_error = level >= LogLevel::Warn;
     auto* stream = to_standard_error ? stderr : stdout;

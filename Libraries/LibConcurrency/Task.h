@@ -13,6 +13,7 @@
 #include <utility>
 
 #include <Common/Noncopyable.h>
+#include <LibConcurrency/Log.h>
 
 namespace Concurrency {
 
@@ -78,6 +79,7 @@ public:
 
         void unhandled_exception()
         {
+            OA_LOG_FATAL(Log::Scheduler, "A coroutine terminated with an unhandled exception, aborting");
             std::terminate();
         }
 

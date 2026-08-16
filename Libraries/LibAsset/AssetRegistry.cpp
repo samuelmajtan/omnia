@@ -8,17 +8,12 @@
 #include <format>
 
 #include <Common/Expected.h>
+#include <Common/Time.h>
 #include <LibAsset/AssetRegistry.h>
 #include <LibAsset/AssetTraits.h>
-#include <LibDebug/Logger.h>
+#include <LibAsset/Log.h>
 
 namespace Asset {
-
-namespace {
-
-constexpr Debug::Logger Logger("Asset Registry");
-
-}
 
 AssetRegistry::AssetRegistry(std::filesystem::path const& root_directory)
     : m_root_directory(root_directory)
@@ -28,6 +23,7 @@ AssetRegistry::AssetRegistry(std::filesystem::path const& root_directory)
 auto AssetRegistry::scan() -> Common::Expected<void>
 {
     if (m_root_directory.empty()) {
+        OA_LOG_WARN(Log::Registry, "No root directory is configured");
         return {};
     }
 
@@ -37,13 +33,20 @@ auto AssetRegistry::scan() -> Common::Expected<void>
         return OA_ERROR("Failed to scan {}: {}", m_root_directory.string(), error.message());
     }
 
+    Time::Stopwatch const stopwatch;
     for (auto const& entry : iterator) {
         if (!entry.is_regular_file()) {
             continue;
         }
 
+        if (entry.path().extension() == AssetSidecar::SIDECAR_EXTENSION) {
+            OA_LOG_TRACE(Log::Registry, "Skipping {}: sidecar file", entry.path().string());
+            continue;
+        }
+
         auto const type = asset_type_for(entry.path());
         if (!type) {
+            OA_LOG_TRACE(Log::Registry, "Skipping {}: no importer claims this extension", entry.path().string());
             continue;
         }
 
@@ -55,6 +58,7 @@ auto AssetRegistry::scan() -> Common::Expected<void>
         } else {
             sidecar = AssetSidecar(Common::UUID::generate(), type.value());
             TRY(sidecar.save(sidecar_path));
+            OA_LOG_DEBUG(Log::Registry, "Assigned {} for {}", sidecar.id(), sidecar_path.string());
         }
 
         AssetEntry const asset_entry {
@@ -63,8 +67,10 @@ auto AssetRegistry::scan() -> Common::Expected<void>
             .source = LooseAssetEntry { .path = entry.path() }
         };
 
+        OA_LOG_TRACE(Log::Registry, "{} -> {} ({})", asset_entry.key, asset_entry.id(), to_string(asset_entry.type()));
         if (auto result = register_asset(asset_entry); !result.has_value()) {
-            Logger.warn("{}", result.error());
+            OA_LOG_WARN(Log::Registry, "{}", result.error());
+            continue;
         }
     }
 

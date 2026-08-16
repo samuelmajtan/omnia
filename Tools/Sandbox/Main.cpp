@@ -7,6 +7,7 @@
 #include <ranges>
 
 #include <Common/Expected.h>
+#include <Common/Time.h>
 #include <Common/Types.h>
 #include <LibAsset/AssetManager.h>
 #include <LibDebug/Logger.h>
@@ -22,7 +23,7 @@
 
 namespace {
 
-constexpr Debug::Logger Logger { "Sandbox" };
+constexpr Debug::Logger Log { "Sandbox" };
 
 }
 
@@ -31,6 +32,7 @@ public:
     static auto create() -> Common::Expected<std::unique_ptr<Sandbox>>
     {
         std::unique_ptr<Sandbox> sandbox(new Sandbox);
+        Time::Stopwatch const stopwatch;
 
         TRY(sandbox->m_asset_manager.load_loose_assets());
 
@@ -82,6 +84,8 @@ public:
 
         sandbox->m_window->event_dispatcher().register_listener<Platform::MouseDeltaEvent>(std::bind_front(&Sandbox::on_mouse_delta, sandbox.get()));
         sandbox->m_window->event_dispatcher().register_listener<Platform::WindowResizeEvent>(std::bind_front(&Sandbox::on_resize, sandbox.get()));
+
+        OA_LOG_INFO(Log, "Startup complete in {:.1f}ms", stopwatch.elapsed_milliseconds());
         return sandbox;
     }
 
@@ -120,15 +124,15 @@ public:
         };
 
         if (auto result = m_swapchain->recreate(swapchain_config); !result.has_value()) {
-            Logger.error("{}", result.error());
+            OA_LOG_ERROR(Log, "{}", result.error());
             return false;
         }
         if (auto result = create_swapchain_render_targets(); !result.has_value()) {
-            Logger.error("{}", result.error());
+            OA_LOG_ERROR(Log, "{}", result.error());
             return false;
         }
         if (auto result = m_deferred_renderer->resize(swapchain_config.width, swapchain_config.height); !result.has_value()) {
-            Logger.error("{}", result.error());
+            OA_LOG_ERROR(Log, "{}", result.error());
             return false;
         }
         return true;
@@ -232,15 +236,18 @@ private:
 
 auto main() -> i32
 {
-    if (auto result = Debug::Logger::initialize(); !result.has_value()) {
-        Logger.warn("{}", result.error());
+    Debug::Logger::Configuration const log_config {
+        .file_level = Debug::LogLevel::Trace
+    };
+    if (auto result = Debug::Logger::initialize(log_config); !result.has_value()) {
+        OA_LOG_WARN(Log, "{}", result.error());
     } else {
-        Logger.info("Logging to {}", Debug::Logger::file_path().string());
+        OA_LOG_INFO(Log, "Logging to {}", Debug::Logger::file_path().string());
     }
 
     auto sandbox = Sandbox::create();
     if (!sandbox.has_value()) {
-        Logger.fatal("{}", sandbox.error());
+        OA_LOG_FATAL(Log, "{}", sandbox.error());
         Debug::Logger::shutdown();
         return EXIT_FAILURE;
     }

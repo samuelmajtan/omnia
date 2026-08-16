@@ -5,16 +5,11 @@
  */
 
 #include <Common/Expected.h>
-#include <LibDebug/Logger.h>
+#include <Common/Time.h>
+#include <LibRenderer/Log.h>
 #include <LibRenderer/ResourceManager.h>
 
 namespace Renderer {
-
-namespace {
-
-constexpr Debug::Logger Logger("Renderer");
-
-}
 
 auto ResourceManager::create(Asset::AssetManager const* asset_manager, RHI::Device* device) -> Common::Expected<std::unique_ptr<ResourceManager>>
 {
@@ -47,6 +42,8 @@ auto ResourceManager::create(Asset::AssetManager const* asset_manager, RHI::Devi
     }
 
     resource_manager->m_material_resource_layout = TRY(device->create_resource_layout(material_resource_layout_config));
+    OA_LOG_TRACE(Log::Resources, "Material resource layout created with {} bindings", material_resource_layout_config.bindings.size());
+
     TRY(resource_manager->initialize_default_resources());
     return resource_manager;
 }
@@ -85,7 +82,7 @@ auto ResourceManager::load_model(Asset::AssetID asset_id) -> Common::Expected<Mo
         }
         auto const texture_result = load_texture(texture_id.value(), format);
         if (!texture_result) {
-            Logger.warn("Falling back to a default texture: {} for model id: {}", texture_result.error(), asset_id);
+            OA_LOG_WARN(Log::Resources, "Falling back to a default texture: {} for model id: {}", texture_result.error(), asset_id);
             return m_texture_cache[default_id].get();
         }
         return texture_result.value();
@@ -111,6 +108,8 @@ auto ResourceManager::load_model(Asset::AssetID asset_id) -> Common::Expected<Mo
     }
 
     m_model_cache[asset_id] = TRY(Model::create(model_config, m_device));
+
+    OA_LOG_DEBUG(Log::Resources, "Model {} cached ({} models cached)", asset_id, m_model_cache.size());
     return m_model_cache[asset_id].get();
 }
 
@@ -131,6 +130,8 @@ auto ResourceManager::load_shader(Asset::AssetID asset_id) -> Common::Expected<R
 
     auto const shader_data = TRY(m_asset_manager->import<RHI::Shader::Configuration>(asset_id));
     m_shader_cache[asset_id] = TRY(m_device->create_shader(shader_data));
+
+    OA_LOG_DEBUG(Log::Resources, "Shader {} cached ({} shaders cached)", asset_id, m_shader_cache.size());
     return m_shader_cache[asset_id].get();
 }
 
@@ -159,6 +160,8 @@ auto ResourceManager::load_texture(Asset::AssetID asset_id, RHI::TextureFormat f
     };
 
     m_texture_cache[asset_id] = TRY(m_device->create_texture(texture_config));
+
+    OA_LOG_TRACE(Log::Resources, "Texture {} cached: {}x{} ({} textures cached)", asset_id, texture_data.width, texture_data.height, m_texture_cache.size());
     return m_texture_cache[asset_id].get();
 }
 

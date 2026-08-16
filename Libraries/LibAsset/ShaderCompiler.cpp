@@ -9,6 +9,7 @@
 
 #include <Common/Expected.h>
 #include <Common/File.h>
+#include <LibAsset/Log.h>
 #include <LibAsset/ShaderCompiler.h>
 
 namespace Asset::ShaderCompiler {
@@ -41,7 +42,9 @@ public:
         if (content.has_value()) {
             data[0] = requesting_source;
             data[1] = content.value();
+            OA_LOG_TRACE(Log::Shader, "{} includes {}", requesting_source, requested_source);
         } else {
+            OA_LOG_WARN(Log::Shader, "Failed to open include '{}' requested by {}: {}", requested_source, requesting_source, content.error());
             data[0] = "";
             data[1] = std::string(content.error().message());
         }
@@ -73,6 +76,10 @@ auto compile_spirv(std::filesystem::path const& shader_path, std::string_view gl
     auto const result = compiler.CompileGlslToSpv(glsl_source.data(), glsl_source.size(), to_shaderc(stage), shader_path.filename().string().c_str(), options);
     if (result.GetCompilationStatus() != shaderc_compilation_status_success) {
         return OA_ERROR("Failed to compile shader '{}': {}", shader_path.string(), result.GetErrorMessage());
+    }
+
+    if (result.GetNumWarnings() > 0) {
+        OA_LOG_WARN(Log::Shader, "{} compiled with {} warning(s): {}", shader_path.filename().string(), result.GetNumWarnings(), result.GetErrorMessage());
     }
 
     std::vector<u32> temp(result.cbegin(), result.cend());

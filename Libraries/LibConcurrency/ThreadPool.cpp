@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+#include <LibConcurrency/Log.h>
 #include <LibConcurrency/ThreadPool.h>
 
 namespace Concurrency {
@@ -16,6 +17,8 @@ ThreadPool::ThreadPool(u32 thread_count)
             worker(stop_token);
         });
     }
+
+    OA_LOG_DEBUG(Log::Threads, "Started {} worker threads", thread_count);
 }
 
 ThreadPool::ThreadPool(std::function<void()> thread_init_callback, u32 thread_count)
@@ -27,10 +30,14 @@ ThreadPool::ThreadPool(std::function<void()> thread_init_callback, u32 thread_co
             worker(stop_token);
         });
     }
+
+    OA_LOG_DEBUG(Log::Threads, "Started {} worker threads", thread_count);
 }
 
 ThreadPool::~ThreadPool()
 {
+    OA_LOG_DEBUG(Log::Threads, "Stopping {} worker threads", m_workers.size());
+
     for (auto& worker : m_workers) {
         worker.request_stop();
     }
@@ -57,6 +64,7 @@ void ThreadPool::worker(std::stop_token const& stop_token)
                 return !m_job_queue.empty() || stop_token.stop_requested();
             });
             if (stop_token.stop_requested()) {
+                OA_LOG_TRACE(Log::Threads, "Worker exiting, stop was requested");
                 break;
             }
 

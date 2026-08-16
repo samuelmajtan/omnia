@@ -8,6 +8,7 @@
 #include <format>
 
 #include <Common/Expected.h>
+#include <LibRHI/Log.h>
 #include <LibRHI/Vulkan/VkBuffer.h>
 #include <LibRHI/Vulkan/VkResourceLayout.h>
 #include <LibRHI/Vulkan/VkResourceSet.h>
@@ -31,6 +32,7 @@ auto VkResourceSet::create(Configuration const& config, RHI::VkDevice* device) -
 
     auto result = vkAllocateDescriptorSets(device->handle(), &descriptor_set_allocate_info, &resource_set->m_handle);
     if (result == VK_ERROR_OUT_OF_POOL_MEMORY) {
+        OA_LOG_DEBUG(Log::Resources, "Descriptor set allocation ran the pool dry, growing it and retrying");
         if (auto new_pool = device->grow_descriptor_pool()) {
             descriptor_set_allocate_info.descriptorPool = *new_pool;
             if (auto regrow_result = vkAllocateDescriptorSets(device->handle(), &descriptor_set_allocate_info, &resource_set->m_handle); regrow_result != VK_SUCCESS) {

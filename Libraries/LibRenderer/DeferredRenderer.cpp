@@ -5,22 +5,29 @@
  */
 
 #include <Common/Expected.h>
+#include <Common/Time.h>
 #include <LibRenderer/DeferredRenderer.h>
+#include <LibRenderer/Log.h>
 
 namespace Renderer {
 
 auto DeferredRenderer::create(Configuration const& config) -> Common::Expected<std::unique_ptr<DeferredRenderer>>
 {
     std::unique_ptr<DeferredRenderer> renderer(new DeferredRenderer(config));
+    Time::Stopwatch const stopwatch;
 
     return renderer->create_passes(config)
         .and_then([&]() {
+            OA_LOG_TRACE(Log::Deferred, "Render passes created");
             return renderer->create_resources(config);
         })
         .and_then([&]() {
+            OA_LOG_TRACE(Log::Deferred, "Resources created");
             return renderer->create_pipelines(config);
         })
         .transform([&]() {
+            OA_LOG_DEBUG(Log::Deferred, "Deferred renderer ready at {}x{} in {:.1f}ms",
+                config.render_target_width, config.render_target_height, stopwatch.elapsed_milliseconds());
             return std::move(renderer);
         });
 }

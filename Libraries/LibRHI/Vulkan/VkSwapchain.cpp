@@ -9,18 +9,12 @@
 #include <format>
 
 #include <Common/Expected.h>
-#include <LibDebug/Logger.h>
 #include <LibPlatform/Window.h>
+#include <LibRHI/Log.h>
 #include <LibRHI/Vulkan/VkRenderTarget.h>
 #include <LibRHI/Vulkan/VkSwapchain.h>
 
 namespace RHI {
-
-namespace {
-
-constexpr Debug::Logger Logger("Vulkan RHI");
-
-}
 
 auto VkSwapchain::create(Configuration const& config, RHI::VkDevice const* device) -> Common::Expected<std::unique_ptr<VkSwapchain>>
 {
@@ -93,8 +87,11 @@ auto VkSwapchain::recreate(const RHI::Swapchain::Configuration& config) -> Commo
 {
     assert(m_handle != VK_NULL_HANDLE);
 
+    OA_LOG_DEBUG(Log::Swapchain, "Recreating swapchain: {}x{} -> {}x{}", m_extent.width, m_extent.height, config.width, config.height);
+
     m_current_frame = 0;
     m_is_dirty = false;
+    m_frame_failure_reported = false;
     m_config = config;
     m_textures.clear();
     m_images.clear();
@@ -120,12 +117,14 @@ auto VkSwapchain::begin_frame() -> std::optional<Frame>
     auto const acquire_result = vkAcquireNextImageKHR(m_device->handle(), m_handle, std::numeric_limits<u64>::max(), m_image_available_semaphores[m_current_frame], VK_NULL_HANDLE, &image_index);
     if (acquire_result == VK_ERROR_OUT_OF_DATE_KHR) {
         m_is_dirty = true;
+        OA_LOG_TRACE(Log::Swapchain, "Acquire reported an out-of-date swapchain, dropping the frame");
         return std::nullopt;
     }
     if (acquire_result != VK_SUCCESS && acquire_result != VK_SUBOPTIMAL_KHR) {
-        Logger.error("Failed to acquire a swapchain image: {}", string_VkResult(acquire_result));
+        report_frame_failure("Failed to acquire a swapchain image", acquire_result);
         return std::nullopt;
     }
+    m_frame_failure_reported = false;
     vkResetFences(m_device->handle(), 1, &m_in_flight_fences[m_current_frame]);
 
     m_command_buffers[m_current_frame].reset();
@@ -156,7 +155,7 @@ void VkSwapchain::end_frame(Frame const& frame)
         .pSignalSemaphores = &m_render_finished_semaphores[m_current_frame]
     };
     if (auto result = vkQueueSubmit(m_device->graphics_queue(), 1, &submit_info, m_in_flight_fences[m_current_frame]); result != VK_SUCCESS) {
-        Logger.error("Failed to submit the frame's command buffer: {}", string_VkResult(result));
+        report_frame_failure("Failed to submit the frame's command buffer", result);
     }
 
     VkPresentInfoKHR const present_info {
@@ -171,11 +170,23 @@ void VkSwapchain::end_frame(Frame const& frame)
     };
     if (auto result = vkQueuePresentKHR(m_device->present_queue(), &present_info); result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
         m_is_dirty = true;
+        OA_LOG_TRACE(Log::Swapchain, "Present reported {}, marking the swapchain dirty", string_VkResult(result));
     } else if (result != VK_SUCCESS) {
-        Logger.error("Failed to present the swapchain image: {}", string_VkResult(result));
+        report_frame_failure("Failed to present the swapchain image", result);
     }
 
     m_current_frame = (m_current_frame + 1) % m_config.frames_in_flight;
+}
+
+void VkSwapchain::report_frame_failure(std::string_view what, VkResult result)
+{
+    if (m_frame_failure_reported) {
+        OA_LOG_TRACE(Log::Swapchain, "{}: {}", what, string_VkResult(result));
+        return;
+    }
+
+    m_frame_failure_reported = true;
+    OA_LOG_ERROR(Log::Swapchain, "{}: {}", what, string_VkResult(result));
 }
 
 auto VkSwapchain::select_surface_format() const -> VkSurfaceFormatKHR
@@ -184,14 +195,26 @@ auto VkSwapchain::select_surface_format() const -> VkSurfaceFormatKHR
     auto surface_format_if = std::ranges::find_if(surface_formats.begin(), surface_formats.end(), [](VkSurfaceFormatKHR const& surface_format) {
         return surface_format.format == VK_FORMAT_R8G8B8A8_SRGB && surface_format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
     });
-    return surface_format_if != surface_formats.end() ? *surface_format_if : surface_formats[0];
+
+    if (surface_format_if == surface_formats.end()) {
+        OA_LOG_WARN(Log::Swapchain, "R8G8B8A8_SRGB with an sRGB non-linear color space is unavailable, falling back to {}",
+            string_VkFormat(surface_formats[0].format));
+        return surface_formats[0];
+    }
+    return *surface_format_if;
 }
 
 auto VkSwapchain::select_present_mode() const -> VkPresentModeKHR
 {
     auto const& present_modes = m_device->selected_physical_device()->present_modes();
     auto present_mode_if = std::ranges::find(present_modes.begin(), present_modes.end(), VK_PRESENT_MODE_MAILBOX_KHR);
-    return present_mode_if != present_modes.end() ? *present_mode_if : VK_PRESENT_MODE_FIFO_KHR;
+    if (present_mode_if == present_modes.end()) {
+        OA_LOG_DEBUG(Log::Swapchain, "Present mode: FIFO (Mailbox is not supported by this surface)");
+        return VK_PRESENT_MODE_FIFO_KHR;
+    }
+
+    OA_LOG_DEBUG(Log::Swapchain, "Present mode: Mailbox");
+    return *present_mode_if;
 }
 
 auto VkSwapchain::select_swap_extent() const -> VkExtent2D
@@ -199,11 +222,19 @@ auto VkSwapchain::select_swap_extent() const -> VkExtent2D
     auto const& surface_capabilities = m_device->selected_physical_device()->surface_capabilities();
 
     if (surface_capabilities.currentExtent.width != std::numeric_limits<u32>::max()) {
+        if (surface_capabilities.currentExtent.width != m_config.width || surface_capabilities.currentExtent.height != m_config.height) {
+            OA_LOG_DEBUG(Log::Swapchain, "Surface dictates a {}x{} extent, overriding the requested {}x{}",
+                surface_capabilities.currentExtent.width, surface_capabilities.currentExtent.height, m_config.width, m_config.height);
+        }
         return surface_capabilities.currentExtent;
     }
 
     auto width = std::clamp<u32>(m_config.width, surface_capabilities.minImageExtent.width, surface_capabilities.maxImageExtent.width);
     auto height = std::clamp<u32>(m_config.height, surface_capabilities.minImageExtent.height, surface_capabilities.maxImageExtent.height);
+    if (width != m_config.width || height != m_config.height) {
+        OA_LOG_WARN(Log::Swapchain, "Requested {}x{} was clamped to {}x{} by the surface limits", m_config.width, m_config.height, width, height);
+    }
+
     return {
         .width = width,
         .height = height
@@ -215,6 +246,7 @@ auto VkSwapchain::select_image_count() const -> u32
     auto const& surface_capabilities = m_device->selected_physical_device()->surface_capabilities();
     auto image_count = surface_capabilities.minImageCount + 1;
     if (surface_capabilities.maxImageCount > 0 && image_count > surface_capabilities.maxImageCount) {
+        OA_LOG_DEBUG(Log::Swapchain, "Image count {} exceeds the surface maximum, clamping to {}", image_count, surface_capabilities.maxImageCount);
         image_count = surface_capabilities.maxImageCount;
     }
     return image_count;
@@ -251,6 +283,10 @@ auto VkSwapchain::create_swapchain() -> Common::Expected<void>
     if (auto result = vkCreateSwapchainKHR(m_device->handle(), &swapchain_create_info, nullptr, &m_handle); result != VK_SUCCESS) {
         return OA_ERROR("Failed to create Vulkan swapchain: {}", string_VkResult(result));
     }
+
+    OA_LOG_INFO(Log::Swapchain, "Swapchain {}x{} {} {} ({} images, {} frames in flight)",
+        m_extent.width, m_extent.height, string_VkFormat(m_surface_format.format),
+        string_VkPresentModeKHR(present_mode), image_count, m_config.frames_in_flight);
     return {};
 }
 
@@ -263,6 +299,10 @@ auto VkSwapchain::create_images() -> Common::Expected<void>
     m_images.resize(actual_image_count);
     if (auto result = vkGetSwapchainImagesKHR(m_device->handle(), m_handle, &actual_image_count, m_images.data()); result != VK_SUCCESS) {
         return OA_ERROR("Failed to retrieve Vulkan swapchain images: {}", string_VkResult(result));
+    }
+
+    if (actual_image_count != static_cast<u32>(m_config.frames_in_flight)) {
+        OA_LOG_DEBUG(Log::Swapchain, "The driver handed back {} images for {} frames in flight", actual_image_count, m_config.frames_in_flight);
     }
 
     m_textures.reserve(m_images.size());

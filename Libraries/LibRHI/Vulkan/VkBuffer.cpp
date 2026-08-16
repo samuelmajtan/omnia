@@ -8,6 +8,7 @@
 #include <format>
 
 #include <Common/Expected.h>
+#include <LibRHI/Log.h>
 #include <LibRHI/Vulkan/VkBuffer.h>
 #include <LibRHI/Vulkan/VkStagingBuffer.h>
 
@@ -88,6 +89,8 @@ auto VkBuffer::create_buffer() -> Common::Expected<void>
     if (auto result = vmaCreateBuffer(m_device->allocator(), &buffer_create_info, &allocation_create_info, &m_handle, &m_allocation, &m_allocation_info); result != VK_SUCCESS) {
         return OA_ERROR("Failed to create Vulkan buffer: {}", string_VkResult(result));
     }
+
+    OA_LOG_TRACE(Log::Resources, "Buffer created: {} bytes, usage {}", m_config.size, static_cast<u32>(m_config.usage));
     return {};
 }
 
@@ -116,6 +119,7 @@ auto VkBuffer::upload_data() -> Common::Expected<void>
     vkCmdCopyBuffer(cmd.handle(), staging_buffer.handle(), m_handle, 1, &copy_region);
     m_device->submit_graphics(cmd);
 
+    OA_LOG_TRACE(Log::Resources, "Staged {} bytes into a device-local buffer", m_config.size);
     return {};
 }
 

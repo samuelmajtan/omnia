@@ -46,4 +46,6 @@ private:
     std::vector<VkPresentModeKHR> m_present_modes {};
 };
 
+auto to_string(VkPhysicalDeviceType type) -> std::string_view;
+
 }

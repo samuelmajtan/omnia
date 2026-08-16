@@ -48,9 +48,12 @@ private:
     auto create_images() -> Common::Expected<void>;
     auto create_command_buffers() -> Common::Expected<void>;
     auto create_sync_objects() -> Common::Expected<void>;
+
+    void report_frame_failure(std::string_view what, VkResult result);
 private:
     Configuration m_config;
     bool m_is_dirty = false;
+    bool m_frame_failure_reported = false;
     VkSurfaceFormatKHR m_surface_format {};
     VkExtent2D m_extent {};
     VkSwapchainKHR m_handle {};

@@ -10,6 +10,7 @@
 #include <Common/Expected.h>
 #include <Common/File.h>
 #include <LibAsset/AssetSidecar.h>
+#include <LibAsset/Log.h>
 #include <LibAsset/TextureImporter.h>
 
 namespace Asset {
@@ -34,10 +35,13 @@ auto TextureImporter::import(ImportContext const& context) -> Common::Expected<T
     i32 channels = 0;
     auto* data = stbi_load_from_memory(reinterpret_cast<stbi_uc const*>(file_content.data()), static_cast<i32>(file_content.size()), &width, &height, &channels, 4);
     if (data == nullptr) {
-        return OA_ERROR("Failed to load texture from file '{}'", path.string());
+        return OA_ERROR("Failed to load texture from file '{}': {}", path.string(), stbi_failure_reason());
     }
     auto const size = static_cast<std::size_t>(width) * height * 4;
     auto const is_srgb = context.sidecar != nullptr && context.sidecar->bool_setting("srgb", false);
+
+    OA_LOG_TRACE(Log::Texture, "{}: {}x{} {}ch -> RGBA8 {}, {} bytes compressed -> {} bytes",
+        path.filename().string(), width, height, channels, is_srgb ? "sRGB" : "linear", file_content.size(), size);
 
     TextureData texture_data;
     texture_data.width = static_cast<u32>(width);

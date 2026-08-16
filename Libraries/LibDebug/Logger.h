@@ -96,3 +96,17 @@ private:
 };
 
 }
+
+#define OA_LOG_AT(logger, level, ...)                    \
+    do {                                                 \
+        if constexpr (::Debug::is_compiled(level)) {     \
+            (logger).log(level, __VA_ARGS__);            \
+        }                                                \
+    } while (false)
+
+#define OA_LOG_TRACE(logger, ...)   OA_LOG_AT(logger, ::Debug::LogLevel::Trace, __VA_ARGS__)
+#define OA_LOG_DEBUG(logger, ...)   OA_LOG_AT(logger, ::Debug::LogLevel::Debug, __VA_ARGS__)
+#define OA_LOG_INFO(logger, ...)    OA_LOG_AT(logger, ::Debug::LogLevel::Info, __VA_ARGS__)
+#define OA_LOG_WARN(logger, ...)    OA_LOG_AT(logger, ::Debug::LogLevel::Warn, __VA_ARGS__)
+#define OA_LOG_ERROR(logger, ...)   OA_LOG_AT(logger, ::Debug::LogLevel::Error, __VA_ARGS__)
+#define OA_LOG_FATAL(logger, ...)   OA_LOG_AT(logger, ::Debug::LogLevel::Fatal, __VA_ARGS__)

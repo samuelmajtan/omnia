@@ -8,6 +8,7 @@
 #include <format>
 
 #include <Common/Expected.h>
+#include <LibRHI/Log.h>
 #include <LibRHI/Vulkan/VkStagingBuffer.h>
 #include <LibRHI/Vulkan/VkTexture.h>
 
@@ -15,6 +16,9 @@ namespace RHI {
 
 auto VkTexture::create_owned(Configuration const& config, RHI::VkDevice const* device) -> Common::Expected<std::unique_ptr<VkTexture>>
 {
+    OA_LOG_TRACE(Log::Resources, "Creating a {}x{} texture, format {}, {} bytes of initial data",
+        config.width, config.height, static_cast<u32>(config.format), config.data.size());
+
     std::unique_ptr<VkTexture> texture(new VkTexture(config, device));
     texture->m_owned = true;
 

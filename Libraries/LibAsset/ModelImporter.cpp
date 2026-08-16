@@ -6,10 +6,13 @@
 
 #define CGLTF_IMPLEMENTATION
 #include <cgltf.h>
+#include <set>
 #include <unordered_map>
 
 #include <Common/Expected.h>
 #include <Common/File.h>
+#include <Common/Time.h>
+#include <LibAsset/Log.h>
 #include <LibAsset/ModelImporter.h>
 
 namespace Asset {
@@ -62,6 +65,9 @@ auto ModelImporter::import_gltf(ImportContext const& context) -> Common::Expecte
         return OA_ERROR("Invalid glTF file '{}'", path.string());
     }
 
+    Time::Stopwatch const stopwatch;
+    OA_LOG_TRACE(Log::Model, "Importing {}: {} bytes, {} meshes, {} materials", path.filename().string(), file_data.size(), data->meshes_count, data->materials_count);
+
     ModelData model_data;
 
     for (cgltf_size i = 0; i < data->materials_count; ++i) {
@@ -75,9 +81,20 @@ auto ModelImporter::import_gltf(ImportContext const& context) -> Common::Expecte
             if (texture_view.texture == nullptr || texture_view.texture->image == nullptr) {
                 return std::nullopt;
             }
-            auto const texture_path = path.parent_path() / texture_view.texture->image->uri;
+
+            auto const* uri = texture_view.texture->image->uri;
+            if (uri == nullptr) {
+                OA_LOG_TRACE(Log::Model, "{}: an image of material '{}' has no URI, so it cannot be resolved", path.filename().string(), material.name);
+                return std::nullopt;
+            }
+
+            auto const texture_path = path.parent_path() / uri;
             auto key = asset_registry->resolve_key(texture_path);
-            return asset_registry->key_to_id(key);
+            auto id = asset_registry->key_to_id(key);
+            if (!id) {
+                OA_LOG_WARN(Log::Model, "{}: texture '{}' is not a registered asset, so materials referencing it fall back to a default", path.filename().string(), uri);
+            }
+            return id;
         };
 
         if (gltf_material.has_pbr_metallic_roughness) {
@@ -111,6 +128,8 @@ auto ModelImporter::import_gltf(ImportContext const& context) -> Common::Expecte
                 return i;
             }
         }
+
+        OA_LOG_WARN(Log::Model, "{}: a primitive references a material that is not in the file, falling back to material 0", path.filename().string());
         return 0;
     };
 
@@ -120,6 +139,7 @@ auto ModelImporter::import_gltf(ImportContext const& context) -> Common::Expecte
         for (cgltf_size j = 0; j < gltf_mesh.primitives_count; ++j) {
             auto const& primitive = gltf_mesh.primitives[j];
             if (primitive.type != cgltf_primitive_type_triangles) {
+                OA_LOG_TRACE(Log::Model, "Dropping primitive {} of mesh {}: only triangle lists are supported", j, i);
                 continue;
             }
 
@@ -147,7 +167,6 @@ auto ModelImporter::import_gltf(ImportContext const& context) -> Common::Expecte
                     tangent_accessor = attribute.data;
                     break;
                 case cgltf_attribute_type_joints:
-                    break;
                 case cgltf_attribute_type_weights:
                     break;
                 default:
@@ -156,6 +175,7 @@ auto ModelImporter::import_gltf(ImportContext const& context) -> Common::Expecte
             }
 
             if (position_accessor == nullptr) {
+                OA_LOG_TRACE(Log::Model, "Dropping primitive {} of mesh {}: it has no POSITION attribute", j, i);
                 continue;
             }
 
@@ -257,6 +277,7 @@ auto ModelImporter::import_gltf(ImportContext const& context) -> Common::Expecte
         return submesh.indices.empty();
     });
 
+    OA_LOG_DEBUG(Log::Model, "Imported {}: {} sub meshes, {} materials, {:.1f}ms", path.filename().string(), model_data.sub_meshes.size(), model_data.materials.size(), stopwatch.elapsed_milliseconds());
     cgltf_free(data);
     return model_data;
 }

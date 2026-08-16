@@ -11,10 +11,12 @@
 #include <Common/ByteStream.h>
 #include <Common/Expected.h>
 #include <Common/File.h>
+#include <Common/Time.h>
 #include <LibAsset/AssetFile.h>
 #include <LibAsset/AssetRegistry.h>
 #include <LibAsset/AssetTraits.h>
 #include <LibAsset/Export.h>
+#include <LibAsset/Log.h>
 
 namespace Asset {
 
@@ -85,12 +87,18 @@ private:
 
         if (!force) {
             if (auto cached = try_load_cooked_asset<T>(entry, source_hash); cached.has_value()) {
+                OA_LOG_TRACE(Log::Manager, "Cache hit for '{}' ({})", entry.key, to_string(entry.type()));
                 return std::move(cached).value();
             }
         }
 
+        OA_LOG_TRACE(Log::Manager, "Importing '{}' from {}", entry.key, source->path.string());
+
+        Time::Stopwatch const stopwatch;
         auto value = TRY(AssetTraits<T>::import(context));
         TRY(write_cooked_asset<T>(entry, value, source_hash));
+
+        OA_LOG_DEBUG(Log::Manager, "Imported '{}' ({}) in {:.1f}ms", entry.key, to_string(entry.type()), stopwatch.elapsed_milliseconds());
         return value;
     }
 
@@ -99,21 +107,32 @@ private:
     {
         auto const contents = File::read_binary(cooked_asset_path(entry.id()));
         if (!contents.has_value()) {
+            OA_LOG_TRACE(Log::Manager, "No cooked asset '{}', importing from source", entry.key);
             return std::nullopt;
         }
 
         Binary::ByteReader reader(contents.value());
         auto const header = AssetFileHeader::read(reader);
         if (!header.has_value()) {
+            OA_LOG_WARN(Log::Manager, "Discarding the cooked asset '{}': {}", entry.key, header.error());
             return std::nullopt;
         }
 
-        if (!header.value().matches(AssetTraits<T>::TYPE, AssetTraits<T>::VERSION, source_hash)) {
+        auto const& file_header = header.value();
+        if (!file_header.matches(AssetTraits<T>::TYPE, AssetTraits<T>::VERSION, source_hash)) {
+            if (file_header.asset_type != AssetTraits<T>::TYPE) {
+                OA_LOG_DEBUG(Log::Manager, "Re-cooking '{}': the blob is {}, expected {}", entry.key, to_string(file_header.asset_type), to_string(AssetTraits<T>::TYPE));
+            } else if (file_header.importer_version != AssetTraits<T>::VERSION) {
+                OA_LOG_DEBUG(Log::Manager, "Re-cooking '{}': importer version {} -> {}", entry.key, file_header.importer_version, AssetTraits<T>::VERSION);
+            } else {
+                OA_LOG_DEBUG(Log::Manager, "Re-cooking '{}': the source or its import settings changed", entry.key);
+            }
             return std::nullopt;
         }
 
         auto value = AssetTraits<T>::read(reader);
         if (!value.has_value()) {
+            OA_LOG_WARN(Log::Manager, "The cooked asset '{}' is corrupt, re-importing: {}", entry.key, value.error());
             return std::nullopt;
         }
         return std::move(value).value();
@@ -139,6 +158,8 @@ private:
         if (auto result = File::write_binary(cooked_asset_path(entry.id()), file.bytes()); !result.has_value()) {
             return OA_ERROR("Failed to write the cooked asset for '{}': {}", entry.key, result.error().message());
         }
+
+        OA_LOG_TRACE(Log::Manager, "Cooked '{}' as {} ({} bytes)", entry.key, cooked_asset_path(entry.id()).string(), file.bytes().size());
         return {};
     }
 private:

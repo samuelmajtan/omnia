@@ -4,9 +4,14 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+#include <LibRHI/Log.h>
 #include <LibRHI/Vulkan/VkPhysicalDevice.h>
 
 namespace RHI {
+
+namespace {
+
+}
 
 VkPhysicalDevice::VkPhysicalDevice(::VkPhysicalDevice handle, VkSurfaceKHR surface)
     : m_handle(handle)
@@ -45,15 +50,26 @@ VkPhysicalDevice::VkPhysicalDevice(::VkPhysicalDevice handle, VkSurfaceKHR surfa
     vkGetPhysicalDeviceSurfacePresentModesKHR(handle, m_surface, &present_mode_count, nullptr);
     m_present_modes.resize(present_mode_count);
     vkGetPhysicalDeviceSurfacePresentModesKHR(handle, m_surface, &present_mode_count, m_present_modes.data());
+
+    OA_LOG_DEBUG(Log::Device, "Enumerated {} ({}, Vulkan {}.{}.{}, driver {}, vendor 0x{:04x})",
+        m_name, to_string(properties.deviceType),
+        VK_API_VERSION_MAJOR(properties.apiVersion), VK_API_VERSION_MINOR(properties.apiVersion), VK_API_VERSION_PATCH(properties.apiVersion),
+        properties.driverVersion, properties.vendorID);
+    OA_LOG_TRACE(Log::Device, "{}: {} queue families, {} surface formats, {} present modes",
+        m_name, queue_family_count, surface_format_count, present_mode_count);
 }
 
 auto VkPhysicalDevice::is_suitable() const -> bool
 {
     if (m_queue_family_indices.graphics == -1U || m_queue_family_indices.present == -1U) {
+        OA_LOG_DEBUG(Log::Device, "Rejecting {}: it has no {} queue family", m_name,
+            m_queue_family_indices.graphics == -1U ? "graphics" : "presentation");
         return false;
     }
 
     if (m_surface_formats.empty() || m_present_modes.empty()) {
+        OA_LOG_DEBUG(Log::Device, "Rejecting {}: it exposes {} surface formats and {} present modes for this surface",
+            m_name, m_surface_formats.size(), m_present_modes.size());
         return false;
     }
 
@@ -76,10 +92,12 @@ auto VkPhysicalDevice::is_suitable() const -> bool
             }
         }
         if (!extension_found) {
+            OA_LOG_DEBUG(Log::Device, "Rejecting {}: it does not support the required extension {}", m_name, required_extension);
             return false;
         }
     }
 
+    OA_LOG_TRACE(Log::Device, "{} is suitable ({} device extensions available)", m_name, extension_count);
     return true;
 }
 
@@ -113,6 +131,22 @@ auto VkPhysicalDevice::surface_capabilities() const -> VkSurfaceCapabilitiesKHR
     VkSurfaceCapabilitiesKHR surface_capabilities {};
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_handle, m_surface, &surface_capabilities);
     return surface_capabilities;
+}
+
+auto to_string(VkPhysicalDeviceType type) -> std::string_view
+{
+    switch (type) {
+    case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
+        return "integrated GPU";
+    case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
+        return "discrete GPU";
+    case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU:
+        return "virtual GPU";
+    case VK_PHYSICAL_DEVICE_TYPE_CPU:
+        return "CPU";
+    default:
+        return "other";
+    }
 }
 
 }

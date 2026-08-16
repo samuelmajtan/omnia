@@ -77,7 +77,7 @@ TEST_F(LoggerTest, WritesTheExpectedLineShape)
     ASSERT_EQ(lines.size(), 1u);
 
     EXPECT_TRUE(lines[0].starts_with("["));
-    constexpr std::string_view SUFFIX = "] [TestComponent - INFO]: Loaded 121 assets in 84ms";
+    constexpr std::string_view SUFFIX = "] [TestComponent] [INFO]: Loaded 121 assets in 84ms";
     EXPECT_EQ(lines[0].find(SUFFIX), 24u);
     EXPECT_EQ(lines[0].size(), 24u + SUFFIX.size());
 }
@@ -97,12 +97,12 @@ TEST_F(LoggerTest, RecordsEveryLevelInOrder)
     auto const lines = logged_lines();
     ASSERT_EQ(lines.size(), 6u);
 
-    EXPECT_NE(lines[0].find("- TRACE]: a"), std::string::npos);
-    EXPECT_NE(lines[1].find("- DEBUG]: b"), std::string::npos);
-    EXPECT_NE(lines[2].find("- INFO]: c"), std::string::npos);
-    EXPECT_NE(lines[3].find("- WARN]: d"), std::string::npos);
-    EXPECT_NE(lines[4].find("- ERROR]: e"), std::string::npos);
-    EXPECT_NE(lines[5].find("- FATAL]: f"), std::string::npos);
+    EXPECT_NE(lines[0].find("[TRACE]: a"), std::string::npos);
+    EXPECT_NE(lines[1].find("[DEBUG]: b"), std::string::npos);
+    EXPECT_NE(lines[2].find("[INFO]: c"), std::string::npos);
+    EXPECT_NE(lines[3].find("[WARN]: d"), std::string::npos);
+    EXPECT_NE(lines[4].find("[ERROR]: e"), std::string::npos);
+    EXPECT_NE(lines[5].find("[FATAL]: f"), std::string::npos);
 }
 
 TEST_F(LoggerTest, DoesNotAppendItsOwnCallSite)
@@ -153,8 +153,8 @@ TEST_F(LoggerTest, DropsLinesBelowTheFileLevel)
 
     auto const lines = logged_lines();
     ASSERT_EQ(lines.size(), 2u);
-    EXPECT_NE(lines[0].find("- WARN]: kept"), std::string::npos);
-    EXPECT_NE(lines[1].find("- ERROR]: kept"), std::string::npos);
+    EXPECT_NE(lines[0].find("[WARN]: kept"), std::string::npos);
+    EXPECT_NE(lines[1].find("[ERROR]: kept"), std::string::npos);
 }
 
 TEST_F(LoggerTest, SetFileLevelTakesEffectImmediately)
@@ -201,7 +201,7 @@ TEST_F(LoggerTest, WritesToAnExplicitlyNamedFile)
 
     auto const lines = read_lines(m_directory / "Nested" / "Custom.log");
     ASSERT_EQ(lines.size(), 1u);
-    EXPECT_NE(lines[0].find("- INFO]: custom"), std::string::npos);
+    EXPECT_NE(lines[0].find("[INFO]: custom"), std::string::npos);
 }
 
 TEST_F(LoggerTest, ReinitializesAfterShutdown)
@@ -247,7 +247,7 @@ TEST_F(LoggerTest, LogsFromManyThreadsWithoutTearingLines)
 
     for (auto const& line : lines) {
         EXPECT_TRUE(line.starts_with("["));
-        EXPECT_NE(line.find(" [TestComponent - INFO]: thread "), std::string::npos);
+        EXPECT_NE(line.find(" [TestComponent] [INFO]: thread "), std::string::npos);
     }
 }
 

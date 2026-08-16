@@ -9,6 +9,8 @@
 #include <format>
 
 #include <Common/Expected.h>
+#include <Common/Time.h>
+#include <LibRHI/Log.h>
 #include <LibRHI/Vulkan/VkDevice.h>
 #include <LibRHI/Vulkan/VkPipeline.h>
 #include <LibRHI/Vulkan/VkRenderPass.h>
@@ -232,10 +234,15 @@ auto VkPipeline::create(Configuration const& config, RHI::VkDevice const* device
         .basePipelineIndex = -1,
     };
 
+    Time::Stopwatch const stopwatch;
     if (auto result = vkCreateGraphicsPipelines(device->handle(), VK_NULL_HANDLE, 1, &pipeline_create_info, nullptr, &pipeline->m_handle); result != VK_SUCCESS) {
         return OA_ERROR("Failed to create vulkan graphics pipeline: {}", string_VkResult(result));
     }
 
+    OA_LOG_DEBUG(Log::Pipeline, "Pipeline created in {:.1f}ms ({} stages, {} vertex attributes, {} color attachments, {} resource layouts, {} push constants)",
+        stopwatch.elapsed_milliseconds(), shader_stages.size(),
+        config.vertex_binding.has_value() ? config.vertex_binding->attributes.size() : 0,
+        config.color_blend_attachments.size(), config.resource_layouts.size(), config.push_constants.size());
     return pipeline;
 }
 

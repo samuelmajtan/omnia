@@ -10,6 +10,7 @@
 
 #include <Common/Expected.h>
 #include <LibPlatform/Event.h>
+#include <LibPlatform/Log.h>
 #include <LibPlatform/Win32/WindowWin32.h>
 
 namespace Platform {
@@ -71,12 +72,16 @@ auto WindowWin32::create(Configuration const& config) -> Common::Expected<std::u
     if (RegisterRawInputDevices(&raw_input_device, 1, sizeof(raw_input_device)) == FALSE) {
         return OA_ERROR("Failed to register raw input device");
     }
+    OA_LOG_DEBUG(Log::Window, "Raw mouse input registered");
 
+    OA_LOG_INFO(Log::Window, "Window '{}' created at {}x{}", window->m_config.title, window->m_config.width, window->m_config.height);
     return window;
 }
 
 WindowWin32::~WindowWin32()
 {
+    OA_LOG_DEBUG(Log::Window, "Destroying window '{}'", m_config.title);
+
     DestroyWindow(m_handle);
     UnregisterClass("omnia_window", m_instance);
 }
@@ -106,9 +111,11 @@ auto WindowWin32::handle_message(u32 message, u64 first_param, i64 second_param)
     case WM_CLOSE:
         m_is_running = false;
 
+        OA_LOG_INFO(Log::Window, "Window close requested");
         m_dispatcher.dispatch(WindowCloseEvent {});
         return true;
     case WM_DESTROY:
+        OA_LOG_DEBUG(Log::Window, "Window destroyed");
         PostQuitMessage(0);
         return true;
     case WM_SIZE: {
@@ -116,8 +123,15 @@ auto WindowWin32::handle_message(u32 message, u64 first_param, i64 second_param)
         auto height = HIWORD(second_param);
 
         if (width == 0 || height == 0) {
+            if (!m_is_minimized) {
+                OA_LOG_DEBUG(Log::Window, "Window minimized");
+            }
             m_is_minimized = true;
             return true;
+        }
+
+        if (m_is_minimized) {
+            OA_LOG_DEBUG(Log::Window, "Window restored at {}x{}", width, height);
         }
 
         m_is_minimized = false;

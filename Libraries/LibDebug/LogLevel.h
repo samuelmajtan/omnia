@@ -10,6 +10,14 @@
 
 #include <Common/Types.h>
 
+#ifdef OA_BUILD_DEBUG
+#    define OA_LOG_COMPILED_LEVEL 0
+#elifdef OA_BUILD_RELWITHDEBINFO
+#    define OA_LOG_COMPILED_LEVEL 1
+#elifdef OA_BUILD_DISTRIBUTION
+#    define OA_LOG_COMPILED_LEVEL 2
+#endif
+
 namespace Debug {
 
 enum class LogLevel : u8 {
@@ -21,6 +29,13 @@ enum class LogLevel : u8 {
     Fatal,
     Off
 };
+
+inline constexpr LogLevel COMPILED_MIN_LEVEL = static_cast<LogLevel>(OA_LOG_COMPILED_LEVEL);
+
+constexpr auto is_compiled(LogLevel level) -> bool
+{
+    return level >= COMPILED_MIN_LEVEL;
+}
 
 constexpr auto to_string(LogLevel level) -> std::string_view
 {

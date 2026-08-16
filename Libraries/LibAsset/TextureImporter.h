@@ -14,7 +14,8 @@ namespace Asset {
 
 enum class TextureColorSpace : u8 {
     Linear = 0,
-    Srgb
+    Srgb,
+    Count
 };
 
 struct TextureData {

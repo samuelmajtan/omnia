@@ -15,12 +15,14 @@ namespace Graphics {
 enum class ShaderFormat : u8 {
     SPIRV = 0,
     DXIL,
-    MetalIR
+    MetalIR,
+    Count
 };
 
 enum class ShaderStage : u8 {
-    Vertex = 1,
-    Fragment
+    Vertex = 0,
+    Fragment,
+    Count
 };
 
 struct ShaderVariant {

@@ -34,9 +34,9 @@ auto AssetFileHeader::read(Binary::ByteReader& reader) -> Common::Expected<Asset
         return OA_ERROR("Cooked with asset format version {}, this build is {}", format_version, VERSION);
     }
 
-    auto asset_type = TRY(reader.read_enum<AssetType>(AssetType::Model, AssetType::Shader));
+    auto asset_type = TRY(reader.read_enum<AssetType>());
     auto importer_version = TRY(reader.read<u32>());
-    auto compression = TRY(reader.read_enum<CompressionMode>(CompressionMode::None, CompressionMode::None));
+    auto compression = TRY(reader.read_enum<CompressionMode>());
     auto source_hash = TRY(reader.read<u64>());
     auto payload_size = TRY(reader.read<u64>());
 

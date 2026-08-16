@@ -378,7 +378,7 @@ auto make_skeleton() -> Asset::SkeletonData
         { .name = "pelvis", .parent_index = 0, .translation = { 0.0F, 2.0F, 0.0F }, .rotation = Math::Quatf::from_axis_angle({ 0.0F, 0.0F, 1.0F }, DEG_TO_RAD(30.0F)), .scale = { 1.0F, 1.0F, 1.0F } },
         { .name = "spine", .parent_index = 1, .translation = { 0.0F, 3.0F, 0.0F }, .rotation = Math::Quatf::identity(), .scale = { 2.0F, 2.0F, 2.0F } },
     };
-    skeleton.skin_joints = { 1, 2 };
+    skeleton.bone_nodes = { 1, 2 };
     skeleton.inverse_bind_matrices = {
         Math::Mat4f::translation(0.0F, -2.0F, 0.0F),
         Math::Mat4f::translation(0.0F, -5.0F, 0.0F)
@@ -433,7 +433,7 @@ TEST(AssetTraits, SkeletonRoundTrips)
         EXPECT_EQ(actual.nodes[index].scale.x, expected.nodes[index].scale.x);
     }
 
-    EXPECT_EQ(actual.skin_joints, expected.skin_joints);
+    EXPECT_EQ(actual.bone_nodes, expected.bone_nodes);
     ASSERT_EQ(actual.inverse_bind_matrices.size(), expected.inverse_bind_matrices.size());
     for (std::size_t index = 0; index < actual.inverse_bind_matrices.size(); ++index) {
         EXPECT_EQ(actual.inverse_bind_matrices[index].elements(), expected.inverse_bind_matrices[index].elements());
@@ -471,10 +471,10 @@ TEST(AssetTraits, SkeletonWithMismatchedInverseBindMatricesIsRejected)
     EXPECT_FALSE(result.has_value());
 }
 
-TEST(AssetTraits, SkeletonJointPointingOutsideTheHierarchyIsRejected)
+TEST(AssetTraits, SkeletonBonePointingOutsideTheHierarchyIsRejected)
 {
     auto model = make_skinned_model();
-    model.skeleton->skin_joints[0] = 99;
+    model.skeleton->bone_nodes[0] = 99;
 
     auto const result = round_trip(model);
     EXPECT_FALSE(result.has_value());

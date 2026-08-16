@@ -91,16 +91,16 @@ auto import_skeleton(cgltf_data const* data, std::string_view file_name) -> std:
 
     SkeletonData skeleton;
     skeleton.nodes = std::move(nodes);
-    skeleton.skin_joints.reserve(skin.joints_count);
+    skeleton.bone_nodes.reserve(skin.joints_count);
     skeleton.inverse_bind_matrices.reserve(skin.joints_count);
 
     for (cgltf_size i = 0; i < skin.joints_count; ++i) {
-        auto const joint = indices.find(skin.joints[i]);
-        if (joint == indices.end()) {
-            OA_LOG_WARN(Log::Model, "{}: joint {} is not part of the node hierarchy, skipping the skin", file_name, i);
+        auto const bone_node = indices.find(skin.joints[i]);
+        if (bone_node == indices.end()) {
+            OA_LOG_WARN(Log::Model, "{}: bone {} is not part of the node hierarchy, skipping the skin", file_name, i);
             return std::nullopt;
         }
-        skeleton.skin_joints.push_back(joint->second);
+        skeleton.bone_nodes.push_back(bone_node->second);
 
         auto& inverse_bind = skeleton.inverse_bind_matrices.emplace_back(Math::Mat4f::identity());
         if (skin.inverse_bind_matrices != nullptr) {
@@ -108,7 +108,7 @@ auto import_skeleton(cgltf_data const* data, std::string_view file_name) -> std:
         }
     }
 
-    OA_LOG_TRACE(Log::Model, "{}: skeleton with {} nodes, {} joints", file_name, skeleton.nodes.size(), skeleton.skin_joints.size());
+    OA_LOG_TRACE(Log::Model, "{}: skeleton with {} nodes, {} bones", file_name, skeleton.nodes.size(), skeleton.bone_nodes.size());
     return skeleton;
 }
 
@@ -248,7 +248,7 @@ auto ModelImporter::import_gltf(ImportContext const& context) -> Common::Expecte
             cgltf_accessor const* normal_accessor = nullptr;
             cgltf_accessor const* tex_coord_accessor = nullptr;
             cgltf_accessor const* tangent_accessor = nullptr;
-            cgltf_accessor const* joints_accessor = nullptr;
+            cgltf_accessor const* bones_accessor = nullptr;
             cgltf_accessor const* weights_accessor = nullptr;
 
             for (cgltf_size k = 0; k < primitive.attributes_count; ++k) {
@@ -267,7 +267,7 @@ auto ModelImporter::import_gltf(ImportContext const& context) -> Common::Expecte
                     tangent_accessor = attribute.data;
                     break;
                 case cgltf_attribute_type_joints:
-                    joints_accessor = attribute.data;
+                    bones_accessor = attribute.data;
                     break;
                 case cgltf_attribute_type_weights:
                     weights_accessor = attribute.data;
@@ -374,14 +374,14 @@ auto ModelImporter::import_gltf(ImportContext const& context) -> Common::Expecte
                 }
             }
 
-            if (joints_accessor != nullptr && weights_accessor != nullptr && model_data.skeleton.has_value()) {
-                auto const bone_limit = static_cast<u32>(model_data.skeleton->skin_joints.size());
+            if (bones_accessor != nullptr && weights_accessor != nullptr && model_data.skeleton.has_value()) {
+                auto const bone_limit = static_cast<u32>(model_data.skeleton->bone_nodes.size());
                 auto reported_out_of_range = false;
 
                 sub_mesh.skinned_vertices.reserve(vertex_count);
                 for (cgltf_size vertex_index = 0; vertex_index < vertex_count; ++vertex_index) {
                     Math::Vec4u bone_indices {};
-                    cgltf_accessor_read_uint(joints_accessor, vertex_index, &bone_indices.x, Graphics::MAX_BONE_INFLUENCES);
+                    cgltf_accessor_read_uint(bones_accessor, vertex_index, &bone_indices.x, Graphics::MAX_BONE_INFLUENCES);
 
                     Math::Vec4f bone_weights {};
                     cgltf_accessor_read_float(weights_accessor, vertex_index, &bone_weights.x, Graphics::MAX_BONE_INFLUENCES);

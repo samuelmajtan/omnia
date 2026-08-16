@@ -35,7 +35,7 @@ struct SkeletonNode {
 
 struct SkeletonData {
     std::vector<SkeletonNode> nodes;
-    std::vector<u32> skin_joints;
+    std::vector<u32> bone_nodes;
     std::vector<Math::Mat4f> inverse_bind_matrices;
 };
 

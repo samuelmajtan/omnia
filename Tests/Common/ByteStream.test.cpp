@@ -159,3 +159,54 @@ TEST(ByteStream, ReadPastEndAfterValidReadsFails)
     EXPECT_TRUE(reader.is_exhausted());
     EXPECT_FALSE(reader.read<u8>().has_value());
 }
+
+namespace {
+
+enum class Fruit : u8 {
+    Apple = 0,
+    Pear,
+    Plum,
+    Count
+};
+
+enum class Unbounded : u8 {
+    First = 0,
+    Second
+};
+
+}
+
+static_assert(Binary::Enumeration<Fruit>);
+static_assert(!Binary::Enumeration<Unbounded>);
+static_assert(!Binary::Enumeration<u8>);
+
+TEST(ByteStream, ReadEnumAcceptsEveryDeclaredEnumerator)
+{
+    Binary::ByteWriter writer;
+    for (auto value : { Fruit::Apple, Fruit::Pear, Fruit::Plum }) {
+        writer.write(static_cast<u8>(value));
+    }
+
+    Binary::ByteReader reader(writer.bytes());
+    EXPECT_EQ(reader.read_enum<Fruit>().value(), Fruit::Apple);
+    EXPECT_EQ(reader.read_enum<Fruit>().value(), Fruit::Pear);
+    EXPECT_EQ(reader.read_enum<Fruit>().value(), Fruit::Plum);
+    EXPECT_TRUE(reader.is_exhausted());
+}
+
+TEST(ByteStream, ReadEnumRejectsTheCountSentinelAndBeyond)
+{
+    Binary::ByteWriter writer;
+    writer.write(static_cast<u8>(Fruit::Count));
+    writer.write(static_cast<u8>(200));
+
+    Binary::ByteReader reader(writer.bytes());
+    EXPECT_FALSE(reader.read_enum<Fruit>().has_value());
+    EXPECT_FALSE(reader.read_enum<Fruit>().has_value());
+}
+
+TEST(ByteStream, ReadEnumOnAnEmptyStreamFails)
+{
+    Binary::ByteReader reader({});
+    EXPECT_FALSE(reader.read_enum<Fruit>().has_value());
+}

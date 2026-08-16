@@ -19,7 +19,8 @@ using AssetID = Common::UUID;
 enum class AssetType : u8 {
     Model = 0,
     Texture,
-    Shader
+    Shader,
+    Count
 };
 
 inline constexpr auto to_string(AssetType type) -> std::string_view
@@ -31,6 +32,8 @@ inline constexpr auto to_string(AssetType type) -> std::string_view
         return "Texture";
     case AssetType::Shader:
         return "Shader";
+    case AssetType::Count:
+        break;
     }
     return "Unknown";
 }

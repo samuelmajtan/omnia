@@ -75,12 +75,12 @@ void AssetTraits<ShaderData>::write(Binary::ByteWriter& writer, ShaderData const
 
 auto AssetTraits<ShaderData>::read(Binary::ByteReader& reader) -> Common::Expected<ShaderData>
 {
-    auto const stage = TRY(reader.read_enum(Graphics::ShaderStage::Vertex, Graphics::ShaderStage::Fragment));
+    auto const stage = TRY(reader.read_enum<Graphics::ShaderStage>());
     auto const variant_count = TRY(reader.read<u64>());
 
     ShaderData data { .stage = stage, .variants = {} };
     for (u64 index = 0; index < variant_count; ++index) {
-        auto const format = TRY(reader.read_enum(Graphics::ShaderFormat::SPIRV, Graphics::ShaderFormat::MetalIR));
+        auto const format = TRY(reader.read_enum<Graphics::ShaderFormat>());
         auto const bytecode = TRY(reader.read_vector<u8>());
         data.variants.push_back({ .format = format, .bytecode = std::move(bytecode) });
     }
@@ -102,7 +102,7 @@ auto AssetTraits<TextureData>::read(Binary::ByteReader& reader) -> Common::Expec
 {
     auto const width = TRY(reader.read<u32>());
     auto const height = TRY(reader.read<u32>());
-    auto const color_space = TRY(reader.read_enum(TextureColorSpace::Linear, TextureColorSpace::Srgb));
+    auto const color_space = TRY(reader.read_enum<TextureColorSpace>());
     auto const pixels = TRY(reader.read_vector<u8>());
 
     // Always 4 channels as enforced by the importer
@@ -155,7 +155,7 @@ void AssetTraits<ModelData>::write(Binary::ByteWriter& writer, ModelData const& 
             writer.write(node.scale);
         }
 
-        writer.write_vector(skeleton.skin_joints);
+        writer.write_vector(skeleton.bone_nodes);
         writer.write_vector(skeleton.inverse_bind_matrices);
     }
 }
@@ -218,15 +218,15 @@ auto AssetTraits<ModelData>::read(Binary::ByteReader& reader) -> Common::Expecte
             skeleton.nodes.push_back(std::move(node));
         }
 
-        skeleton.skin_joints = TRY(reader.read_vector<u32>());
+        skeleton.bone_nodes = TRY(reader.read_vector<u32>());
         skeleton.inverse_bind_matrices = TRY(reader.read_vector<Math::Mat4f>());
 
-        if (skeleton.skin_joints.size() != skeleton.inverse_bind_matrices.size()) {
-            return OA_ERROR("Skeleton has {} joints but {} inverse bind matrices", skeleton.skin_joints.size(), skeleton.inverse_bind_matrices.size());
+        if (skeleton.bone_nodes.size() != skeleton.inverse_bind_matrices.size()) {
+            return OA_ERROR("Skeleton has {} bones but {} inverse bind matrices", skeleton.bone_nodes.size(), skeleton.inverse_bind_matrices.size());
         }
-        for (auto const joint : skeleton.skin_joints) {
-            if (joint >= skeleton.nodes.size()) {
-                return OA_ERROR("Skeleton joint points at node {} but the hierarchy only has {}", joint, skeleton.nodes.size());
+        for (auto const bone_node : skeleton.bone_nodes) {
+            if (bone_node >= skeleton.nodes.size()) {
+                return OA_ERROR("Skeleton bone points at node {} but the hierarchy only has {}", bone_node, skeleton.nodes.size());
             }
         }
         data.skeleton = std::move(skeleton);
@@ -240,7 +240,7 @@ auto AssetTraits<ModelData>::read(Binary::ByteReader& reader) -> Common::Expecte
             continue;
         }
 
-        auto const bone_count = data.skeleton.has_value() ? data.skeleton->skin_joints.size() : 0;
+        auto const bone_count = data.skeleton.has_value() ? data.skeleton->bone_nodes.size() : 0;
         for (auto const& vertex : sub_mesh.skinned_vertices) {
             auto const& bones = vertex.bone_indices;
             if (bones.x >= bone_count || bones.y >= bone_count || bones.z >= bone_count || bones.w >= bone_count) {

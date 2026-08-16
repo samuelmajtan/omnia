@@ -161,3 +161,38 @@ TEST(UUIDTest, SurvivesBinarySerialization)
     EXPECT_EQ(read.value(), uuid);
     EXPECT_TRUE(reader.is_exhausted());
 }
+
+TEST(UUIDTest, DeriveIsStableAndNameDependent)
+{
+    auto const parent = UUID::generate();
+
+    EXPECT_EQ(UUID::derive(parent, "walk"), UUID::derive(parent, "walk"));
+    EXPECT_NE(UUID::derive(parent, "walk"), UUID::derive(parent, "run"));
+    EXPECT_NE(UUID::derive(parent, "walk"), UUID::derive(UUID::generate(), "walk"));
+    EXPECT_NE(UUID::derive(parent, "walk"), parent);
+}
+
+TEST(UUIDTest, DerivedUUIDsAreVersion8)
+{
+    auto const derived = UUID::derive(UUID::generate(), "march");
+
+    EXPECT_EQ(derived.version(), 8);
+    EXPECT_NE(derived.version(), UUID::generate().version());
+    EXPECT_NE(derived.version(), UUID(1).version());
+}
+
+TEST(UUIDTest, DeriveIsConstantEvaluable)
+{
+    static constexpr auto parent = UUID(0x0123456789ABCDEFULL);
+    static constexpr auto derived = UUID::derive(parent, "walk");
+
+    static_assert(derived.version() == 8);
+    static_assert(!(derived == parent));
+    EXPECT_EQ(derived, UUID::derive(parent, "walk"));
+}
+
+TEST(UUIDTest, DeriveRoundTripsThroughString)
+{
+    auto const derived = UUID::derive(UUID::generate(), "walk");
+    EXPECT_EQ(UUID::from_string(derived.to_string()), derived);
+}

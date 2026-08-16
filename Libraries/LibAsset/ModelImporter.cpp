@@ -4,18 +4,57 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-#define CGLTF_IMPLEMENTATION
-#include <cgltf.h>
-#include <set>
-#include <unordered_map>
-
 #include <Common/Expected.h>
 #include <Common/File.h>
 #include <Common/Time.h>
 #include <LibAsset/Log.h>
 #include <LibAsset/ModelImporter.h>
+#include <LibAsset/glTF.h>
 
 namespace Asset {
+
+namespace {
+
+auto import_skeleton(cgltf_data const* data, std::string_view file_name) -> std::optional<Graphics::SkeletonData>
+{
+    if (data->skins_count == 0) {
+        return std::nullopt;
+    }
+    if (data->skins_count > 1) {
+        OA_LOG_WARN(Log::Model, "{}: {} skins found, only the first is imported", file_name, data->skins_count);
+    }
+
+    auto const& skin = data->skins[0];
+    auto [nodes, indices] = glTF::flatten_node_hierarchy(data);
+    if (nodes.size() != data->nodes_count) {
+        OA_LOG_WARN(Log::Model, "{}: reached {} of {} nodes, the hierarchy has a cycle", file_name, nodes.size(), data->nodes_count);
+        return std::nullopt;
+    }
+
+    Graphics::SkeletonData skeleton;
+    skeleton.nodes = std::move(nodes);
+    skeleton.bone_nodes.reserve(skin.joints_count);
+    skeleton.inverse_bind_matrices.reserve(skin.joints_count);
+
+    for (cgltf_size i = 0; i < skin.joints_count; ++i) {
+        auto const bone_node = indices.find(skin.joints[i]);
+        if (bone_node == indices.end()) {
+            OA_LOG_WARN(Log::Model, "{}: bone {} is not part of the node hierarchy, skipping the skin", file_name, i);
+            return std::nullopt;
+        }
+        skeleton.bone_nodes.push_back(bone_node->second);
+
+        auto& inverse_bind = skeleton.inverse_bind_matrices.emplace_back(Math::Mat4f::identity());
+        if (skin.inverse_bind_matrices != nullptr) {
+            cgltf_accessor_read_float(skin.inverse_bind_matrices, i, inverse_bind.data(), 16);
+        }
+    }
+
+    OA_LOG_TRACE(Log::Model, "{}: skeleton with {} nodes, {} bones", file_name, skeleton.nodes.size(), skeleton.bone_nodes.size());
+    return skeleton;
+}
+
+}
 
 auto ModelImporter::import(ImportContext const& context) -> Common::Expected<ModelData>
 {
@@ -45,30 +84,30 @@ auto ModelImporter::supported_extensions() -> std::vector<std::string>
     return { ".gltf" };
 }
 
+auto ModelImporter::enumerate_sub_assets(std::filesystem::path const& path) -> Common::Expected<std::vector<SubAssetDescriptor>>
+{
+    auto const gltf = TRY(glTF::parse(path));
+
+    std::vector<SubAssetDescriptor> descriptors;
+    descriptors.reserve(gltf->animations_count);
+    for (cgltf_size index = 0; index < gltf->animations_count; ++index) {
+        descriptors.push_back({ .name = glTF::clip_name(gltf->animations[index], index), .type = AssetType::Animation });
+    }
+    return descriptors;
+}
+
 auto ModelImporter::import_gltf(ImportContext const& context) -> Common::Expected<ModelData>
 {
     auto const& path = context.path;
     auto const* asset_registry = context.registry;
-    auto const file_data = TRY(File::read_all(path));
-
-    cgltf_options const options {};
-    cgltf_data* data = nullptr;
-    if (cgltf_parse(&options, file_data.data(), file_data.size(), &data) != cgltf_result_success) {
-        return OA_ERROR("Failed to parse glTF file '{}'", path.string());
-    }
-    if (cgltf_load_buffers(&options, data, path.string().c_str()) != cgltf_result_success) {
-        cgltf_free(data);
-        return OA_ERROR("Failed to load buffers for glTF file '{}'", path.string());
-    }
-    if (cgltf_validate(data) != cgltf_result_success) {
-        cgltf_free(data);
-        return OA_ERROR("Invalid glTF file '{}'", path.string());
-    }
+    auto const gltf = TRY(glTF::load(path));
+    auto const* data = gltf.get();
 
     Time::Stopwatch const stopwatch;
-    OA_LOG_TRACE(Log::Model, "Importing {}: {} bytes, {} meshes, {} materials", path.filename().string(), file_data.size(), data->meshes_count, data->materials_count);
+    OA_LOG_TRACE(Log::Model, "Importing {}: {} meshes, {} materials", path.filename().string(), data->meshes_count, data->materials_count);
 
     ModelData model_data;
+    model_data.skeleton = import_skeleton(data, path.filename().string());
 
     for (cgltf_size i = 0; i < data->materials_count; ++i) {
         auto const& gltf_material = data->materials[i];
@@ -150,6 +189,8 @@ auto ModelImporter::import_gltf(ImportContext const& context) -> Common::Expecte
             cgltf_accessor const* normal_accessor = nullptr;
             cgltf_accessor const* tex_coord_accessor = nullptr;
             cgltf_accessor const* tangent_accessor = nullptr;
+            cgltf_accessor const* bones_accessor = nullptr;
+            cgltf_accessor const* weights_accessor = nullptr;
 
             for (cgltf_size k = 0; k < primitive.attributes_count; ++k) {
                 auto const& attribute = primitive.attributes[k];
@@ -167,7 +208,10 @@ auto ModelImporter::import_gltf(ImportContext const& context) -> Common::Expecte
                     tangent_accessor = attribute.data;
                     break;
                 case cgltf_attribute_type_joints:
+                    bones_accessor = attribute.data;
+                    break;
                 case cgltf_attribute_type_weights:
+                    weights_accessor = attribute.data;
                     break;
                 default:
                     break;
@@ -270,6 +314,49 @@ auto ModelImporter::import_gltf(ImportContext const& context) -> Common::Expecte
                     vertex.tangent = Math::Vec4f(t.x, t.y, t.z, handedness);
                 }
             }
+
+            if (bones_accessor != nullptr && weights_accessor != nullptr && model_data.skeleton.has_value()) {
+                auto const bone_limit = static_cast<u32>(model_data.skeleton->bone_nodes.size());
+                auto reported_out_of_range = false;
+
+                sub_mesh.skinned_vertices.reserve(vertex_count);
+                for (cgltf_size vertex_index = 0; vertex_index < vertex_count; ++vertex_index) {
+                    Math::Vec4u bone_indices {};
+                    cgltf_accessor_read_uint(bones_accessor, vertex_index, &bone_indices.x, Graphics::MAX_BONE_INFLUENCES);
+
+                    Math::Vec4f bone_weights {};
+                    cgltf_accessor_read_float(weights_accessor, vertex_index, &bone_weights.x, Graphics::MAX_BONE_INFLUENCES);
+
+                    auto const total = bone_weights.x + bone_weights.y + bone_weights.z + bone_weights.w;
+                    if (total > 0.0F) {
+                        bone_weights /= total;
+                    } else {
+                        bone_weights = Math::Vec4f(1.0F, 0.0F, 0.0F, 0.0F);
+                    }
+
+                    for (auto* bone : { &bone_indices.x, &bone_indices.y, &bone_indices.z, &bone_indices.w }) {
+                        if (*bone >= bone_limit) {
+                            if (!reported_out_of_range) {
+                                OA_LOG_WARN(Log::Model, "{}: primitive {} of mesh {} references bone {} but the skin only has {}, clamping to 0",
+                                    path.filename().string(), j, i, *bone, bone_limit);
+                                reported_out_of_range = true;
+                            }
+                            *bone = 0;
+                        }
+                    }
+
+                    auto const& vertex = sub_mesh.vertices[vertex_index];
+                    sub_mesh.skinned_vertices.push_back({ .position = vertex.position,
+                        .tex_coord = vertex.tex_coord,
+                        .normal = vertex.normal,
+                        .tangent = vertex.tangent,
+                        .bone_indices = bone_indices,
+                        .bone_weights = bone_weights });
+                }
+
+                sub_mesh.vertices.clear();
+                sub_mesh.vertices.shrink_to_fit();
+            }
         }
     }
 
@@ -278,7 +365,6 @@ auto ModelImporter::import_gltf(ImportContext const& context) -> Common::Expecte
     });
 
     OA_LOG_DEBUG(Log::Model, "Imported {}: {} sub meshes, {} materials, {:.1f}ms", path.filename().string(), model_data.sub_meshes.size(), model_data.materials.size(), stopwatch.elapsed_milliseconds());
-    cgltf_free(data);
     return model_data;
 }
 

@@ -16,10 +16,14 @@ namespace Asset {
 
 using AssetID = Common::UUID;
 
+inline constexpr char SUB_ASSET_SEPARATOR = '#';
+
 enum class AssetType : u8 {
     Model = 0,
     Texture,
-    Shader
+    Shader,
+    Animation,
+    Count
 };
 
 inline constexpr auto to_string(AssetType type) -> std::string_view
@@ -31,6 +35,10 @@ inline constexpr auto to_string(AssetType type) -> std::string_view
         return "Texture";
     case AssetType::Shader:
         return "Shader";
+    case AssetType::Animation:
+        return "Animation";
+    case AssetType::Count:
+        break;
     }
     return "Unknown";
 }
@@ -45,6 +53,9 @@ inline constexpr auto asset_type_from_string(std::string_view name) -> std::opti
     }
     if (name == "Shader") {
         return AssetType::Shader;
+    }
+    if (name == "Animation") {
+        return AssetType::Animation;
     }
     return std::nullopt;
 }

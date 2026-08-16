@@ -46,29 +46,19 @@ public:
     auto load_packed_assets() -> Common::Expected<void>;
 
     template<AssetData T>
-    auto import(std::string const& key) const -> Common::Expected<T>
-    {
-        auto id = m_asset_registry.key_to_id(key);
-        if (!id) {
-            return OA_ERROR("Asset with key '{}' not found", key);
-        }
-        return import <T>(id.value());
-    }
-
-    template<AssetData T>
     auto import(AssetID id) const -> Common::Expected<T>
     {
         auto entry = TRY(m_asset_registry.resolve(id));
         return import_entry<T>(entry, false);
     }
-
 private:
-    auto context_for(AssetEntry const& entry, std::filesystem::path const& path) const -> ImportContext
+    auto context_for(AssetEntry const& entry, LooseAssetEntry const& source) const -> ImportContext
     {
         return ImportContext {
-            .path = path,
+            .path = source.path,
             .registry = &m_asset_registry,
-            .sidecar = &entry.sidecar
+            .sidecar = &entry.sidecar,
+            .sub_asset = source.sub_asset
         };
     }
 
@@ -80,7 +70,7 @@ private:
             return OA_ERROR("Packed assets are not supported yet");
         }
 
-        auto const context = context_for(entry, source->path);
+        auto const context = context_for(entry, *source);
 
         auto hash = TRY(AssetTraits<T>::source_hash(context));
         auto const source_hash = entry.sidecar.hash_settings(hash);

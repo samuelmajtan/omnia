@@ -24,6 +24,9 @@ namespace Binary {
 template<typename T>
 concept Serializable = std::is_trivially_copyable_v<T> && std::is_default_constructible_v<T>;
 
+template<typename T>
+concept Enumeration = std::is_enum_v<T> && requires { T::Count; };
+
 class ByteWriter final {
 public:
     template<Serializable T>
@@ -120,12 +123,12 @@ public:
         return values;
     }
 
-    template<typename Enum> requires std::is_enum_v<Enum>
-    auto read_enum(Enum lowest, Enum highest) -> Common::Expected<Enum>
+    template<typename Enum> requires Enumeration<Enum>
+    auto read_enum() -> Common::Expected<Enum>
     {
         auto const value = TRY(read<u8>());
-        if (value < static_cast<u8>(lowest) || value > static_cast<u8>(highest)) {
-            return OA_ERROR("Invalid enum value {} in stream, expected {} to {}", value, static_cast<u8>(lowest), static_cast<u8>(highest));
+        if (value >= static_cast<u8>(Enum::Count)) {
+            return OA_ERROR("Invalid enum value {} in stream, expected less than {}", value, static_cast<u8>(Enum::Count));
         }
         return static_cast<Enum>(value);
     }

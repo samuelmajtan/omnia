@@ -347,6 +347,8 @@ auto to_vk(AttributeFormat format) -> VkFormat
         return VK_FORMAT_R32G32_SFLOAT;
     case AttributeFormat::Float32:
         return VK_FORMAT_R32_SFLOAT;
+    case AttributeFormat::Uint32Vec4:
+        return VK_FORMAT_R32G32B32A32_UINT;
     }
 }
 

@@ -10,10 +10,11 @@
 
 namespace Asset::Log {
 
-inline constexpr Debug::Logger Registry { "LibAsset - Registry" };
-inline constexpr Debug::Logger Manager  { "LibAsset - Manager" };
-inline constexpr Debug::Logger Model    { "LibAsset - Model" };
-inline constexpr Debug::Logger Texture  { "LibAsset - Texture" };
-inline constexpr Debug::Logger Shader   { "LibAsset - Shader" };
+inline constexpr Debug::Logger Registry     { "LibAsset - Registry" };
+inline constexpr Debug::Logger Manager      { "LibAsset - Manager" };
+inline constexpr Debug::Logger Model        { "LibAsset - Model" };
+inline constexpr Debug::Logger Texture      { "LibAsset - Texture" };
+inline constexpr Debug::Logger Shader       { "LibAsset - Shader" };
+inline constexpr Debug::Logger Animation    { "LibAsset - Animation" };
 
 }

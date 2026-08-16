@@ -9,6 +9,7 @@
 #include <Common/Expected.h>
 #include <LibAsset/AssetManager.h>
 #include <LibRHI/Device.h>
+#include <LibRenderer/AnimatedModel.h>
 #include <LibRenderer/Export.h>
 #include <LibRenderer/Model.h>
 
@@ -26,9 +27,14 @@ public:
 
     static auto create(Asset::AssetManager const* asset_manager, RHI::Device* device) -> Common::Expected<std::unique_ptr<ResourceManager>>;
 
-    auto resource_layout() const -> RHI::ResourceLayout const*;
+    auto material_resource_layout() const -> RHI::ResourceLayout const*;
+    auto bone_resource_layout() const -> RHI::ResourceLayout const*;
+
     auto load_model(std::string const& asset_name) -> Common::Expected<Model const*>;
     auto load_model(Asset::AssetID asset_id) -> Common::Expected<Model const*>;
+
+    auto load_animated_model(std::string const& asset_name, u32 frames_in_flight = 2) -> Common::Expected<std::unique_ptr<AnimatedModel>>;
+    auto load_animated_model(Asset::AssetID asset_id, u32 frames_in_flight = 2) -> Common::Expected<std::unique_ptr<AnimatedModel>>;
 
     auto load_shader(std::string const& asset_name) -> Common::Expected<RHI::Shader const*>;
     auto load_shader(Asset::AssetID asset_id) -> Common::Expected<RHI::Shader const*>;
@@ -42,6 +48,7 @@ private:
     RHI::Device* m_device {};
     Asset::AssetManager const* m_asset_manager {};
     std::unique_ptr<RHI::ResourceLayout> m_material_resource_layout;
+    std::unique_ptr<RHI::ResourceLayout> m_bone_resource_layout;
     std::unordered_map<Asset::AssetID, std::unique_ptr<RHI::Texture>> m_texture_cache;
     std::unordered_map<Asset::AssetID, std::unique_ptr<RHI::Shader>> m_shader_cache;
     std::unordered_map<Asset::AssetID, std::unique_ptr<Model>> m_model_cache;

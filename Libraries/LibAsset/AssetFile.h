@@ -18,7 +18,8 @@
 namespace Asset {
 
 enum class CompressionMode : u8 {
-    None = 0
+    None = 0,
+    Count
 };
 
 struct ASSET_API AssetFileHeader {

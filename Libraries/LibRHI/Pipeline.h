@@ -49,6 +49,7 @@ enum class AttributeFormat : u8 {
     Float32Vec2,
     Float32Vec3,
     Float32Vec4,
+    Uint32Vec4,
 };
 
 class Pipeline {
@@ -86,7 +87,7 @@ public:
     struct PushConstant {
         u32 size;
         u32 offset;
-        Graphics::ShaderStage stage;
+        Graphics::ShaderStageMask stage;
     };
 
     struct Configuration {

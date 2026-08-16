@@ -55,6 +55,22 @@ public:
         return uuid;
     }
 
+    static constexpr auto derive(UUID const& parent, std::string_view text) -> UUID
+    {
+        auto const high = Hash::fnv1a(text, Hash::fnv1a(parent.bytes()));
+        auto const low = Hash::fnv1a(parent.bytes(), high);
+
+        UUID uuid;
+        for (std::size_t i = 0; i < sizeof(high); ++i) {
+            uuid.m_data[i] = static_cast<std::byte>((high >> ((7 - i) * 8)) & 0xFF);
+            uuid.m_data[i + 8] = static_cast<std::byte>((low >> ((7 - i) * 8)) & 0xFF);
+        }
+
+        uuid.m_data[6] = (uuid.m_data[6] & std::byte { 0x0F }) | std::byte { 0x80 };
+        uuid.m_data[8] = (uuid.m_data[8] & std::byte { 0x3F }) | std::byte { 0x80 };
+        return uuid;
+    }
+
     static constexpr auto from_string(std::string_view string) -> std::optional<UUID>
     {
         if (string.size() != STRING_SIZE) {

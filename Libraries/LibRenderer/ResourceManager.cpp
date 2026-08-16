@@ -25,7 +25,7 @@ auto ResourceManager::create(Asset::AssetManager const* asset_manager, RHI::Devi
             {
                 .binding = 0,
                 .type = RHI::ResourceType::UniformBuffer,
-                .stage = Graphics::ShaderStage::Fragment
+                .stage = Graphics::ShaderStageMask::Fragment
             },
         }
     };
@@ -36,7 +36,7 @@ auto ResourceManager::create(Asset::AssetManager const* asset_manager, RHI::Devi
             {
                 .binding = i,
                 .type = RHI::ResourceType::Texture,
-                .stage = Graphics::ShaderStage::Fragment
+                .stage = Graphics::ShaderStageMask::Fragment
             }
         );
     }
@@ -44,13 +44,29 @@ auto ResourceManager::create(Asset::AssetManager const* asset_manager, RHI::Devi
     resource_manager->m_material_resource_layout = TRY(device->create_resource_layout(material_resource_layout_config));
     OA_LOG_TRACE(Log::Resources, "Material resource layout created with {} bindings", material_resource_layout_config.bindings.size());
 
+    RHI::ResourceLayout::Configuration const bone_resource_layout_config {
+        .bindings = {
+            {
+                .binding = 0,
+                .type = RHI::ResourceType::UniformBuffer,
+                .stage = Graphics::ShaderStageMask::Vertex
+            }
+        }
+    };
+    resource_manager->m_bone_resource_layout = TRY(device->create_resource_layout(bone_resource_layout_config));
+
     TRY(resource_manager->initialize_default_resources());
     return resource_manager;
 }
 
-auto ResourceManager::resource_layout() const -> RHI::ResourceLayout const*
+auto ResourceManager::material_resource_layout() const -> RHI::ResourceLayout const*
 {
     return m_material_resource_layout.get();
+}
+
+auto ResourceManager::bone_resource_layout() const -> RHI::ResourceLayout const*
+{
+    return m_bone_resource_layout.get();
 }
 
 auto ResourceManager::load_model(std::string const& asset_name) -> Common::Expected<Model const*>
@@ -90,7 +106,8 @@ auto ResourceManager::load_model(Asset::AssetID asset_id) -> Common::Expected<Mo
 
     Model::Configuration model_config {
         .sub_meshes = model_data.sub_meshes,
-        .materials = {}
+        .materials = {},
+        .skeleton = model_data.skeleton
     };
     model_config.materials.reserve(model_data.materials.size());
     for (auto const& material_data : model_data.materials) {
@@ -111,6 +128,37 @@ auto ResourceManager::load_model(Asset::AssetID asset_id) -> Common::Expected<Mo
 
     OA_LOG_DEBUG(Log::Resources, "Model {} cached ({} models cached)", asset_id, m_model_cache.size());
     return m_model_cache[asset_id].get();
+}
+
+auto ResourceManager::load_animated_model(std::string const& asset_name, u32 frames_in_flight) -> Common::Expected<std::unique_ptr<AnimatedModel>>
+{
+    auto asset_id_result = m_asset_manager->registry().key_to_id(asset_name);
+    if (!asset_id_result.has_value()) {
+        return OA_ERROR("Failed to find asset with name '{}'", asset_name);
+    }
+    return load_animated_model(asset_id_result.value(), frames_in_flight);
+}
+
+auto ResourceManager::load_animated_model(Asset::AssetID asset_id, u32 frames_in_flight) -> Common::Expected<std::unique_ptr<AnimatedModel>>
+{
+    auto const* model = TRY(load_model(asset_id));
+
+    auto const& registry = m_asset_manager->registry();
+    std::vector<Asset::AnimationClip> animations;
+    for (auto const sub_asset_id : registry.sub_assets_of(asset_id, Asset::AssetType::Animation)) {
+        animations.emplace_back(TRY(m_asset_manager->import<Asset::AnimationData>(sub_asset_id)));
+    }
+
+    AnimatedModel::Configuration animated_model_config {
+        .model = model,
+        .animations = std::move(animations),
+        .frames_in_flight = frames_in_flight,
+        .resource_layout = m_bone_resource_layout.get()
+    };
+    auto animated_model = TRY(AnimatedModel::create(std::move(animated_model_config), m_device));
+
+    OA_LOG_DEBUG(Log::Resources, "Animated model {} created with {} animations", asset_id, animated_model->animations().size());
+    return animated_model;
 }
 
 auto ResourceManager::load_shader(std::string const& asset_name) -> Common::Expected<RHI::Shader const*>

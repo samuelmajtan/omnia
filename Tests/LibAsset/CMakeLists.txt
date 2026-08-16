@@ -1,4 +1,5 @@
 set(SOURCES
+    Animation.test.cpp
     AssetManager.test.cpp
     AssetRegistry.test.cpp
     AssetSidecar.test.cpp

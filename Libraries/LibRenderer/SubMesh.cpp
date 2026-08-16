@@ -11,10 +11,13 @@ namespace Renderer {
 
 auto SubMesh::create(Configuration const& configuration, RHI::Device const* device) -> Common::Expected<SubMesh>
 {
+    auto const skinned = configuration.is_skinned();
     RHI::Buffer::Configuration const vertex_buffer_config {
-        .size = configuration.vertices.size() * sizeof(Graphics::Vertex),
+        .size = skinned ? configuration.skinned_vertices.size() * sizeof(Graphics::SkinnedVertex)
+                        : configuration.vertices.size() * sizeof(Graphics::Vertex),
         .usage = RHI::BufferUsage::Vertex,
-        .data = configuration.vertices.data()
+        .data = skinned ? static_cast<void const*>(configuration.skinned_vertices.data())
+                        : static_cast<void const*>(configuration.vertices.data())
     };
 
     RHI::Buffer::Configuration const index_buffer_config {
@@ -28,6 +31,7 @@ auto SubMesh::create(Configuration const& configuration, RHI::Device const* devi
     submesh.m_index_buffer = TRY(device->create_buffer(index_buffer_config));
     submesh.m_index_count = configuration.indices.size();
     submesh.m_material_index = configuration.material_index;
+    submesh.m_is_skinned = skinned;
     return submesh;
 }
 
@@ -49,6 +53,11 @@ auto SubMesh::index_count() const -> u64
 auto SubMesh::material_index() const -> u64
 {
     return m_material_index;
+}
+
+auto SubMesh::is_skinned() const -> bool
+{
+    return m_is_skinned;
 }
 
 }

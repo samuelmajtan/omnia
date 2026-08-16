@@ -280,3 +280,88 @@ TEST(Mat4, FromTrsIdentityInputsGiveIdentity)
         EXPECT_NEAR(identity[i], Math::Mat4f::identity()[i], 1e-6F) << "element " << i;
     }
 }
+
+namespace {
+
+void expect_mat4_near(Math::Mat4f const& actual, Math::Mat4f const& expected, f32 tolerance = 1e-4F)
+{
+    for (size_t i = 0; i < 16; ++i) {
+        EXPECT_NEAR(actual[i], expected[i], tolerance) << "element " << i;
+    }
+}
+
+}
+
+TEST(Mat4, ToQuaternionInvertsFromQuaternion)
+{
+    Math::Vec3f const axes[] = {
+        { 0.0F, 0.0F, 1.0F }, { 1.0F, 0.0F, 0.0F }, { 0.0F, 1.0F, 0.0F }, { 0.3F, -0.5F, 0.8F }
+    };
+
+    for (auto const& axis : axes) {
+        for (auto degrees : { 5.0F, 90.0F, 179.0F, 270.0F }) {
+            auto const quat = Math::Quatf::from_axis_angle(axis, DEG_TO_RAD(degrees));
+            auto const round_tripped = Math::Mat4f::from_quaternion(quat).to_quaternion();
+
+            expect_mat4_near(Math::Mat4f::from_quaternion(round_tripped), Math::Mat4f::from_quaternion(quat));
+        }
+    }
+}
+
+TEST(Mat4, ToQuaternionOfIdentityIsIdentity)
+{
+    auto const quat = Math::Mat4f::identity().to_quaternion();
+
+    EXPECT_NEAR(quat.x, 0.0F, 1e-6F);
+    EXPECT_NEAR(quat.y, 0.0F, 1e-6F);
+    EXPECT_NEAR(quat.z, 0.0F, 1e-6F);
+    EXPECT_NEAR(std::abs(quat.w), 1.0F, 1e-6F);
+}
+
+TEST(Mat4, DecomposeRoundTripsThroughFromTrs)
+{
+    Math::Vec3f const expected_translation { 3.0F, -4.0F, 5.0F };
+    auto const expected_rotation = Math::Quatf::from_axis_angle({ 0.2F, 0.7F, -0.4F }, DEG_TO_RAD(123.0F));
+    Math::Vec3f const expected_scale { 2.0F, 0.5F, 3.0F };
+
+    auto const original = Math::Mat4f::from_trs(expected_translation, expected_rotation, expected_scale);
+    auto const [translation, rotation, scale] = original.decompose();
+
+    EXPECT_NEAR(translation.x, expected_translation.x, 1e-4F);
+    EXPECT_NEAR(translation.y, expected_translation.y, 1e-4F);
+    EXPECT_NEAR(translation.z, expected_translation.z, 1e-4F);
+    EXPECT_NEAR(scale.x, expected_scale.x, 1e-4F);
+    EXPECT_NEAR(scale.y, expected_scale.y, 1e-4F);
+    EXPECT_NEAR(scale.z, expected_scale.z, 1e-4F);
+
+    expect_mat4_near(Math::Mat4f::from_trs(translation, rotation, scale), original);
+}
+
+TEST(Mat4, DecomposeHandlesPureRotationMatrices)
+{
+    auto const original = Math::Mat4f::from_quaternion(Math::Quatf::from_axis_angle({ 1.0F, 0.0F, 0.0F }, DEG_TO_RAD(-90.0F)));
+    auto const [translation, rotation, scale] = original.decompose();
+
+    EXPECT_NEAR(scale.x, 1.0F, 1e-5F);
+    EXPECT_NEAR(scale.y, 1.0F, 1e-5F);
+    EXPECT_NEAR(scale.z, 1.0F, 1e-5F);
+    expect_mat4_near(Math::Mat4f::from_trs(translation, rotation, scale), original);
+}
+
+TEST(Mat4, DecomposeDetectsMirroring)
+{
+    auto const original = Math::Mat4f::from_trs({ 0.0F, 0.0F, 0.0F }, Math::Quatf::identity(), { -1.0F, 1.0F, 1.0F });
+    auto const [translation, rotation, scale] = original.decompose();
+
+    EXPECT_LT(scale.x * scale.y * scale.z, 0.0F);
+    expect_mat4_near(Math::Mat4f::from_trs(translation, rotation, scale), original);
+}
+
+TEST(Mat4, DecomposeOfADegenerateMatrixDoesNotProduceNaN)
+{
+    auto const [translation, rotation, scale] = Math::Mat4f::from_trs({ 1.0F, 2.0F, 3.0F }, Math::Quatf::identity(), { 0.0F, 0.0F, 0.0F }).decompose();
+
+    EXPECT_FALSE(std::isnan(rotation.x + rotation.y + rotation.z + rotation.w));
+    EXPECT_NEAR(translation.x, 1.0F, 1e-6F);
+    EXPECT_NEAR(scale.x, 0.0F, 1e-6F);
+}

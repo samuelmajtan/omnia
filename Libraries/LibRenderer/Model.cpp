@@ -19,6 +19,9 @@ auto Model::create(Configuration const& configuration, RHI::Device* device) -> C
             return model->create_materials(configuration.materials, device);
         })
         .transform([&]() {
+            if (configuration.skeleton.has_value()) {
+                model->m_skeleton = Asset::Skeleton(configuration.skeleton.value());
+            }
             return std::move(model);
         });
 }
@@ -49,6 +52,11 @@ auto Model::sub_meshes() const -> std::vector<SubMesh> const&
 auto Model::materials() const -> std::vector<Material> const&
 {
     return m_materials;
+}
+
+auto Model::skeleton() const -> std::optional<Asset::Skeleton> const&
+{
+    return m_skeleton;
 }
 
 }

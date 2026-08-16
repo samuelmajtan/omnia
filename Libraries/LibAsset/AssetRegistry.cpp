@@ -8,7 +8,6 @@
 #include <format>
 
 #include <Common/Expected.h>
-#include <Common/Time.h>
 #include <LibAsset/AssetRegistry.h>
 #include <LibAsset/AssetTraits.h>
 #include <LibAsset/Log.h>
@@ -33,7 +32,6 @@ auto AssetRegistry::scan() -> Common::Expected<void>
         return OA_ERROR("Failed to scan {}: {}", m_root_directory.string(), error.message());
     }
 
-    Time::Stopwatch const stopwatch;
     for (auto const& entry : iterator) {
         if (!entry.is_regular_file()) {
             continue;
@@ -72,6 +70,17 @@ auto AssetRegistry::scan() -> Common::Expected<void>
             OA_LOG_WARN(Log::Registry, "{}", result.error());
             continue;
         }
+
+        auto const sub_assets = sub_assets_for(asset_entry.type(), entry.path());
+        if (!sub_assets.has_value()) {
+            OA_LOG_DEBUG(Log::Registry, "No sub-assets listed for '{}': {}", asset_entry.key, sub_assets.error());
+            continue;
+        }
+        for (auto const& descriptor : sub_assets.value()) {
+            if (auto result = register_sub_asset(asset_entry, descriptor); !result.has_value()) {
+                OA_LOG_WARN(Log::Registry, "{}", result.error());
+            }
+        }
     }
 
     return {};
@@ -79,37 +88,91 @@ auto AssetRegistry::scan() -> Common::Expected<void>
 
 auto AssetRegistry::register_asset(AssetEntry const& entry) -> Common::Expected<void>
 {
-    if (auto const existing = m_assets_by_key.find(entry.key); existing != m_assets_by_key.end()) {
-        return OA_ERROR("Duplicate asset key '{}' -- keeping the first, ignoring the second. Keys drop the file extension, so two files in one directory whose names differ only by extension will collide", entry.key);
+    if (m_assets_by_id.contains(entry.id())) {
+        return OA_ERROR("Duplicate asset ID {} for '{}' -- keeping the first", entry.id(), entry.key);
+    }
+    if (m_ids_by_key.contains(entry.key)) {
+        return OA_ERROR("Duplicate asset key '{}' -- keeping the first", entry.key);
     }
 
-    m_assets_by_key[entry.key] = entry;
-    m_keys_by_id[entry.id()] = entry.key;
+    m_assets_by_id[entry.id()] = entry;
+    m_ids_by_key[entry.key] = entry.id();
+    return {};
+}
+
+auto AssetRegistry::register_sub_asset(AssetEntry const& parent, SubAssetDescriptor const& descriptor) -> Common::Expected<void>
+{
+    if (descriptor.name.empty()) {
+        return OA_ERROR("Sub-asset of '{}' has an empty name", parent.key);
+    }
+    if (descriptor.name.contains(SUB_ASSET_SEPARATOR)) {
+        return OA_ERROR("Sub-asset name '{}' of '{}' contains the reserved '{}' separator", descriptor.name, parent.key, SUB_ASSET_SEPARATOR);
+    }
+
+    auto const* source = std::get_if<LooseAssetEntry>(&parent.source);
+    if (source == nullptr) {
+        return OA_ERROR("Cannot derive sub-asset '{}': packed assets are not supported yet", descriptor.name);
+    }
+    if (source->sub_asset.has_value()) {
+        return OA_ERROR("Cannot derive sub-asset '{}' from '{}', which is itself a sub-asset", descriptor.name, parent.key);
+    }
+
+    AssetSidecar sidecar(Common::UUID::derive(parent.id(), descriptor.name), descriptor.type);
+    if (auto const name = parent.sidecar.setting(AssetSidecar::NAME_SETTING)) {
+        sidecar.set_setting(AssetSidecar::NAME_SETTING, name.value());
+    }
+
+    AssetEntry const entry {
+        .sidecar = std::move(sidecar),
+        .key = resolve_sub_asset_key(parent.key, descriptor.name),
+        .source = LooseAssetEntry { .path = source->path, .sub_asset = descriptor.name }
+    };
+
+    OA_LOG_TRACE(Log::Registry, "{} -> {} ({})", entry.key, entry.id(), to_string(entry.type()));
+    TRY(register_asset(entry));
+
+    m_sub_assets_by_parent[parent.id()].push_back(entry.id());
     return {};
 }
 
 auto AssetRegistry::key_to_id(std::string const& key) const -> std::optional<AssetID>
 {
-    auto const it = m_assets_by_key.find(key);
-    if (it == m_assets_by_key.end()) {
+    auto const it = m_ids_by_key.find(key);
+    if (it == m_ids_by_key.end()) {
         return std::nullopt;
     }
-    return it->second.id();
+    return it->second;
+}
+
+auto AssetRegistry::sub_assets_of(AssetID parent, AssetType sub_asset_type) const -> std::vector<AssetID>
+{
+    auto const it = m_sub_assets_by_parent.find(parent);
+    if (it == m_sub_assets_by_parent.end()) {
+        return {};
+    }
+
+    std::vector<AssetID> result;
+    for (auto const& sub_asset_id : it->second) {
+        auto const asset = resolve(sub_asset_id);
+        if (!asset.has_value()) {
+            OA_LOG_WARN(Log::Registry, "Sub-asset {} of {} is registered but not found in the registry", sub_asset_id, parent);
+            continue;
+        }
+        if (asset->type() != sub_asset_type) {
+            continue;
+        }
+        result.push_back(sub_asset_id);
+    }
+    return result;
 }
 
 auto AssetRegistry::resolve(AssetID id) const -> Common::Expected<AssetEntry>
 {
-    auto const key_it = m_keys_by_id.find(id);
-    if (key_it == m_keys_by_id.end()) {
-        return OA_ERROR("Asset with ID {} not found in asset registry", id);
+    auto const asset_it = m_assets_by_id.find(id);
+    if (asset_it != m_assets_by_id.end()) {
+        return asset_it->second;
     }
-
-    auto const asset_it = m_assets_by_key.find(key_it->second);
-    if (asset_it == m_assets_by_key.end()) {
-        return OA_ERROR("Asset with ID {} not found in asset registry", id);
-    }
-
-    return asset_it->second;
+    return OA_ERROR("No asset with ID {} is registered", id);
 }
 
 auto AssetRegistry::resolve_key(std::filesystem::path path) const -> std::string
@@ -120,9 +183,14 @@ auto AssetRegistry::resolve_key(std::filesystem::path path) const -> std::string
     return path.generic_string();
 }
 
-auto AssetRegistry::entries() const -> std::unordered_map<std::string, AssetEntry> const&
+auto AssetRegistry::resolve_sub_asset_key(std::string const& parent_key, std::string const& sub_asset_name) -> std::string
 {
-    return m_assets_by_key;
+    return std::format("{}{}{}", parent_key, SUB_ASSET_SEPARATOR, sub_asset_name);
+}
+
+auto AssetRegistry::entries() const -> std::unordered_map<AssetID, AssetEntry> const&
+{
+    return m_assets_by_id;
 }
 
 }

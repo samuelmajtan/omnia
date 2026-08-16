@@ -26,7 +26,7 @@ public:
     struct Binding {
         u32 binding;
         ResourceType type;
-        Graphics::ShaderStage stage;
+        Graphics::ShaderStageMask stage;
     };
 
     struct Configuration {

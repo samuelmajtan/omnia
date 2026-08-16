@@ -28,16 +28,18 @@ struct MaterialData {
 struct ModelData {
     std::vector<Graphics::SubMeshData> sub_meshes;
     std::vector<MaterialData> materials;
+    std::optional<Graphics::SkeletonData> skeleton = std::nullopt;
 };
 
 class ASSET_API ModelImporter final {
 public:
-    static constexpr u32 VERSION = 2;
+    static constexpr u32 VERSION = 3;
 
 public:
     static auto import(ImportContext const& context) -> Common::Expected<ModelData>;
     static auto source_hash(ImportContext const& context) -> Common::Expected<u64>;
     static auto supported_extensions() -> std::vector<std::string>;
+    static auto enumerate_sub_assets(std::filesystem::path const& path) -> Common::Expected<std::vector<SubAssetDescriptor>>;
 private:
     static auto import_gltf(ImportContext const& context) -> Common::Expected<ModelData>;
 };

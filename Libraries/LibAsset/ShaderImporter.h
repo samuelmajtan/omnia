@@ -17,7 +17,7 @@ using ShaderData = Graphics::ShaderData;
 
 class ASSET_API ShaderImporter final {
 public:
-    static constexpr u32 VERSION = 1;
+    static constexpr u32 VERSION = 2;
 
 public:
     static auto import(ImportContext const& context) -> Common::Expected<ShaderData>;

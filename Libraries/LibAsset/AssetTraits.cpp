@@ -126,6 +126,7 @@ void AssetTraits<ModelData>::write(Binary::ByteWriter& writer, ModelData const& 
     writer.write(static_cast<u64>(data.sub_meshes.size()));
     for (auto const& sub_mesh : data.sub_meshes) {
         writer.write_vector(sub_mesh.vertices);
+        writer.write_vector(sub_mesh.skinned_vertices);
         writer.write_vector(sub_mesh.indices);
         writer.write(sub_mesh.material_index);
     }
@@ -140,6 +141,23 @@ void AssetTraits<ModelData>::write(Binary::ByteWriter& writer, ModelData const& 
         writer.write_optional(material.emissive_texture_id);
         writer.write(material.parameters);
     }
+
+    writer.write(static_cast<u8>(data.skeleton.has_value() ? 1 : 0));
+    if (data.skeleton.has_value()) {
+        auto const& skeleton = data.skeleton.value();
+
+        writer.write(static_cast<u64>(skeleton.nodes.size()));
+        for (auto const& node : skeleton.nodes) {
+            writer.write_string(node.name);
+            writer.write(node.parent_index);
+            writer.write(node.translation);
+            writer.write(node.rotation);
+            writer.write(node.scale);
+        }
+
+        writer.write_vector(skeleton.skin_joints);
+        writer.write_vector(skeleton.inverse_bind_matrices);
+    }
 }
 
 auto AssetTraits<ModelData>::read(Binary::ByteReader& reader) -> Common::Expected<ModelData>
@@ -150,9 +168,15 @@ auto AssetTraits<ModelData>::read(Binary::ByteReader& reader) -> Common::Expecte
     for (u64 index = 0; index < sub_mesh_count; ++index) {
         data.sub_meshes.push_back({
             .vertices = TRY(reader.read_vector<Graphics::Vertex>()),
+            .skinned_vertices = TRY(reader.read_vector<Graphics::SkinnedVertex>()),
             .indices = TRY(reader.read_vector<Graphics::Index>()),
             .material_index = TRY(reader.read<u64>()),
         });
+
+        auto const& sub_mesh = data.sub_meshes.back();
+        if (!sub_mesh.vertices.empty() && !sub_mesh.skinned_vertices.empty()) {
+            return OA_ERROR("Submesh {} holds both {} plain and {} skinned vertices, it must hold one or the other", index, sub_mesh.vertices.size(), sub_mesh.skinned_vertices.size());
+        }
     }
 
     auto const material_count = TRY(reader.read<u64>());
@@ -175,9 +199,53 @@ auto AssetTraits<ModelData>::read(Binary::ByteReader& reader) -> Common::Expecte
         data.materials.push_back(std::move(material));
     }
 
+    if (TRY(reader.read<u8>()) != 0) {
+        SkeletonData skeleton;
+
+        auto const node_count = TRY(reader.read<u64>());
+        skeleton.nodes.reserve(node_count);
+        for (u64 index = 0; index < node_count; ++index) {
+            SkeletonNode node;
+            node.name = TRY(reader.read_string());
+            node.parent_index = TRY(reader.read<i32>());
+            node.translation = TRY(reader.read<Math::Vec3f>());
+            node.rotation = TRY(reader.read<Math::Quatf>());
+            node.scale = TRY(reader.read<Math::Vec3f>());
+
+            if (node.parent_index < -1 || node.parent_index >= static_cast<i32>(index)) {
+                return OA_ERROR("Skeleton node {} has parent {}, which breaks the parent-before-child ordering", index, node.parent_index);
+            }
+            skeleton.nodes.push_back(std::move(node));
+        }
+
+        skeleton.skin_joints = TRY(reader.read_vector<u32>());
+        skeleton.inverse_bind_matrices = TRY(reader.read_vector<Math::Mat4f>());
+
+        if (skeleton.skin_joints.size() != skeleton.inverse_bind_matrices.size()) {
+            return OA_ERROR("Skeleton has {} joints but {} inverse bind matrices", skeleton.skin_joints.size(), skeleton.inverse_bind_matrices.size());
+        }
+        for (auto const joint : skeleton.skin_joints) {
+            if (joint >= skeleton.nodes.size()) {
+                return OA_ERROR("Skeleton joint points at node {} but the hierarchy only has {}", joint, skeleton.nodes.size());
+            }
+        }
+        data.skeleton = std::move(skeleton);
+    }
+
     for (auto const& sub_mesh : data.sub_meshes) {
         if (sub_mesh.material_index >= data.materials.size()) {
             return OA_ERROR("Submesh references material {} but the model only has {}", sub_mesh.material_index, data.materials.size());
+        }
+        if (!sub_mesh.is_skinned()) {
+            continue;
+        }
+
+        auto const bone_count = data.skeleton.has_value() ? data.skeleton->skin_joints.size() : 0;
+        for (auto const& vertex : sub_mesh.skinned_vertices) {
+            auto const& bones = vertex.bone_indices;
+            if (bones.x >= bone_count || bones.y >= bone_count || bones.z >= bone_count || bones.w >= bone_count) {
+                return OA_ERROR("A skinned vertex references a bone outside the skin's {} bones", bone_count);
+            }
         }
     }
 

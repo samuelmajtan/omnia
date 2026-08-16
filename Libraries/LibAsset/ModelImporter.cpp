@@ -6,7 +6,11 @@
 
 #define CGLTF_IMPLEMENTATION
 #include <cgltf.h>
+#include <array>
+#include <cstring>
+#include <limits>
 #include <set>
+#include <tuple>
 #include <unordered_map>
 
 #include <Common/Expected.h>
@@ -16,6 +20,99 @@
 #include <LibAsset/ModelImporter.h>
 
 namespace Asset {
+
+namespace {
+
+auto local_transform(cgltf_node const& node) -> std::tuple<Math::Vec3f, Math::Quatf, Math::Vec3f>
+{
+    if (node.has_matrix) {
+        Math::Mat4f matrix;
+        std::memcpy(matrix.data(), node.matrix, sizeof(f32) * 16);
+        return matrix.decompose();
+    }
+
+    return {
+        node.has_translation ? Math::Vec3f(node.translation[0], node.translation[1], node.translation[2]) : Math::Vec3f {},
+        node.has_rotation ? Math::Quatf(node.rotation[0], node.rotation[1], node.rotation[2], node.rotation[3]) : Math::Quatf::identity(),
+        node.has_scale ? Math::Vec3f(node.scale[0], node.scale[1], node.scale[2]) : Math::Vec3f(1.0F, 1.0F, 1.0F)
+    };
+}
+
+auto flatten_node_hierarchy(cgltf_data const* data) -> std::pair<std::vector<SkeletonNode>, std::unordered_map<cgltf_node const*, u32>>
+{
+    std::vector<SkeletonNode> nodes;
+    std::unordered_map<cgltf_node const*, u32> indices;
+    nodes.reserve(data->nodes_count);
+
+    std::vector<std::pair<cgltf_node const*, i32>> pending;
+    for (cgltf_size i = data->nodes_count; i-- > 0;) {
+        if (data->nodes[i].parent == nullptr) {
+            pending.emplace_back(&data->nodes[i], -1);
+        }
+    }
+
+    while (!pending.empty()) {
+        auto const [node, parent_index] = pending.back();
+        pending.pop_back();
+
+        auto const [translation, rotation, scale] = local_transform(*node);
+        auto const index = static_cast<u32>(nodes.size());
+        indices[node] = index;
+        nodes.push_back({
+            .name = node->name != nullptr ? node->name : std::format("Node_{}", index),
+            .parent_index = parent_index,
+            .translation = translation,
+            .rotation = rotation,
+            .scale = scale });
+
+        for (cgltf_size i = node->children_count; i-- > 0;) {
+            pending.emplace_back(node->children[i], static_cast<i32>(index));
+        }
+    }
+
+    return { std::move(nodes), std::move(indices) };
+}
+
+auto import_skeleton(cgltf_data const* data, std::string_view file_name) -> std::optional<SkeletonData>
+{
+    if (data->skins_count == 0) {
+        return std::nullopt;
+    }
+    if (data->skins_count > 1) {
+        OA_LOG_WARN(Log::Model, "{}: {} skins found, only the first is imported", file_name, data->skins_count);
+    }
+
+    auto const& skin = data->skins[0];
+    auto [nodes, indices] = flatten_node_hierarchy(data);
+    if (nodes.size() != data->nodes_count) {
+        OA_LOG_WARN(Log::Model, "{}: reached {} of {} nodes, the hierarchy has a cycle", file_name, nodes.size(), data->nodes_count);
+        return std::nullopt;
+    }
+
+    SkeletonData skeleton;
+    skeleton.nodes = std::move(nodes);
+    skeleton.skin_joints.reserve(skin.joints_count);
+    skeleton.inverse_bind_matrices.reserve(skin.joints_count);
+
+    for (cgltf_size i = 0; i < skin.joints_count; ++i) {
+        auto const joint = indices.find(skin.joints[i]);
+        if (joint == indices.end()) {
+            OA_LOG_WARN(Log::Model, "{}: joint {} is not part of the node hierarchy, skipping the skin", file_name, i);
+            return std::nullopt;
+        }
+        skeleton.skin_joints.push_back(joint->second);
+
+        auto& inverse_bind = skeleton.inverse_bind_matrices.emplace_back(Math::Mat4f::identity());
+        if (skin.inverse_bind_matrices != nullptr) {
+            cgltf_accessor_read_float(skin.inverse_bind_matrices, i, inverse_bind.data(), 16);
+        }
+    }
+
+    OA_LOG_TRACE(Log::Model, "{}: skeleton with {} nodes, {} joints", file_name, skeleton.nodes.size(), skeleton.skin_joints.size());
+    return skeleton;
+}
+
+}
 
 auto ModelImporter::import(ImportContext const& context) -> Common::Expected<ModelData>
 {
@@ -69,6 +166,7 @@ auto ModelImporter::import_gltf(ImportContext const& context) -> Common::Expecte
     OA_LOG_TRACE(Log::Model, "Importing {}: {} bytes, {} meshes, {} materials", path.filename().string(), file_data.size(), data->meshes_count, data->materials_count);
 
     ModelData model_data;
+    model_data.skeleton = import_skeleton(data, path.filename().string());
 
     for (cgltf_size i = 0; i < data->materials_count; ++i) {
         auto const& gltf_material = data->materials[i];
@@ -150,6 +248,8 @@ auto ModelImporter::import_gltf(ImportContext const& context) -> Common::Expecte
             cgltf_accessor const* normal_accessor = nullptr;
             cgltf_accessor const* tex_coord_accessor = nullptr;
             cgltf_accessor const* tangent_accessor = nullptr;
+            cgltf_accessor const* joints_accessor = nullptr;
+            cgltf_accessor const* weights_accessor = nullptr;
 
             for (cgltf_size k = 0; k < primitive.attributes_count; ++k) {
                 auto const& attribute = primitive.attributes[k];
@@ -167,7 +267,10 @@ auto ModelImporter::import_gltf(ImportContext const& context) -> Common::Expecte
                     tangent_accessor = attribute.data;
                     break;
                 case cgltf_attribute_type_joints:
+                    joints_accessor = attribute.data;
+                    break;
                 case cgltf_attribute_type_weights:
+                    weights_accessor = attribute.data;
                     break;
                 default:
                     break;
@@ -269,6 +372,50 @@ auto ModelImporter::import_gltf(ImportContext const& context) -> Common::Expecte
 
                     vertex.tangent = Math::Vec4f(t.x, t.y, t.z, handedness);
                 }
+            }
+
+            if (joints_accessor != nullptr && weights_accessor != nullptr && model_data.skeleton.has_value()) {
+                auto const bone_limit = static_cast<u32>(model_data.skeleton->skin_joints.size());
+                auto reported_out_of_range = false;
+
+                sub_mesh.skinned_vertices.reserve(vertex_count);
+                for (cgltf_size vertex_index = 0; vertex_index < vertex_count; ++vertex_index) {
+                    Math::Vec4u bone_indices {};
+                    cgltf_accessor_read_uint(joints_accessor, vertex_index, &bone_indices.x, Graphics::MAX_BONE_INFLUENCES);
+
+                    Math::Vec4f bone_weights {};
+                    cgltf_accessor_read_float(weights_accessor, vertex_index, &bone_weights.x, Graphics::MAX_BONE_INFLUENCES);
+
+                    auto const total = bone_weights.x + bone_weights.y + bone_weights.z + bone_weights.w;
+                    if (total > 0.0F) {
+                        bone_weights /= total;
+                    } else {
+                        bone_weights = Math::Vec4f(1.0F, 0.0F, 0.0F, 0.0F);
+                    }
+
+                    for (auto* bone : { &bone_indices.x, &bone_indices.y, &bone_indices.z, &bone_indices.w }) {
+                        if (*bone >= bone_limit) {
+                            if (!reported_out_of_range) {
+                                OA_LOG_WARN(Log::Model, "{}: primitive {} of mesh {} references bone {} but the skin only has {}, clamping to 0",
+                                    path.filename().string(), j, i, *bone, bone_limit);
+                                reported_out_of_range = true;
+                            }
+                            *bone = 0;
+                        }
+                    }
+
+                    auto const& vertex = sub_mesh.vertices[vertex_index];
+                    sub_mesh.skinned_vertices.push_back({
+                        .position = vertex.position,
+                        .tex_coord = vertex.tex_coord,
+                        .normal = vertex.normal,
+                        .tangent = vertex.tangent,
+                        .bone_indices = bone_indices,
+                        .bone_weights = bone_weights });
+                }
+
+                sub_mesh.vertices.clear();
+                sub_mesh.vertices.shrink_to_fit();
             }
         }
     }

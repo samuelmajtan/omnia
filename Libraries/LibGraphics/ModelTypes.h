@@ -21,6 +21,17 @@ struct Vertex {
     Math::Vec4f tangent;
 };
 
+struct SkinnedVertex {
+    Math::Vec3f position;
+    Math::Vec2f tex_coord;
+    Math::Vec3f normal;
+    Math::Vec4f tangent;
+    Math::Vec4u bone_indices;
+    Math::Vec4f bone_weights;
+};
+
+inline constexpr u32 MAX_BONE_INFLUENCES = 4;
+
 using Index = u32;
 
 struct MaterialParameters {
@@ -34,8 +45,19 @@ struct MaterialParameters {
 
 struct SubMeshData {
     std::vector<Vertex> vertices;
+    std::vector<SkinnedVertex> skinned_vertices;
     std::vector<Index> indices;
     u64 material_index;
+
+    auto is_skinned() const -> bool
+    {
+        return !skinned_vertices.empty();
+    }
+
+    auto vertex_count() const -> u64
+    {
+        return is_skinned() ? skinned_vertices.size() : vertices.size();
+    }
 };
 
 }

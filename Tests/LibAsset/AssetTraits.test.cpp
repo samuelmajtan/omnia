@@ -45,8 +45,8 @@ auto make_model() -> Asset::ModelData
 
     return Asset::ModelData {
         .sub_meshes = {
-            { .vertices = { make_vertex(0.0F), make_vertex(10.0F), make_vertex(20.0F) }, .indices = { 0, 1, 2 }, .material_index = 0 },
-            { .vertices = { make_vertex(30.0F) }, .indices = { 0, 0, 0 }, .material_index = 1 },
+            { .vertices = { make_vertex(0.0F), make_vertex(10.0F), make_vertex(20.0F) }, .skinned_vertices = {}, .indices = { 0, 1, 2 }, .material_index = 0 },
+            { .vertices = { make_vertex(30.0F) }, .skinned_vertices = {}, .indices = { 0, 0, 0 }, .material_index = 1 },
         },
         .materials = { material, untextured }
     };
@@ -208,7 +208,7 @@ TEST(SerializeModel, TextureSlotsDoNotGetSwapped)
     material.occlusion_texture_id = Common::UUID::generate();
 
     auto const result = round_trip(Asset::ModelData {
-        .sub_meshes = { { .vertices = { make_vertex(0.0F) }, .indices = { 0 }, .material_index = 0 } },
+        .sub_meshes = { { .vertices = { make_vertex(0.0F) }, .skinned_vertices = {}, .indices = { 0 }, .material_index = 0 } },
         .materials = { material } });
 
     ASSERT_TRUE(result.has_value()) << result.error();
@@ -354,4 +354,155 @@ TEST(AssetFileHeader, RejectsPayloadSizeLongerThanTheFile)
 
     Binary::ByteReader reader(writer.bytes());
     EXPECT_FALSE(Asset::AssetFileHeader::read(reader).has_value());
+}
+
+namespace {
+
+auto make_skinned_vertex(f32 seed, Math::Vec4u bone_indices) -> Graphics::SkinnedVertex
+{
+    return Graphics::SkinnedVertex {
+        .position = { seed, seed + 1.0F, seed + 2.0F },
+        .tex_coord = { seed + 3.0F, seed + 4.0F },
+        .normal = { 0.0F, 1.0F, 0.0F },
+        .tangent = { 1.0F, 0.0F, 0.0F, -1.0F },
+        .bone_indices = bone_indices,
+        .bone_weights = { 0.5F, 0.25F, 0.15F, 0.1F }
+    };
+}
+
+auto make_skeleton() -> Asset::SkeletonData
+{
+    Asset::SkeletonData skeleton;
+    skeleton.nodes = {
+        { .name = "root", .parent_index = -1, .translation = { 0.0F, 1.0F, 0.0F }, .rotation = Math::Quatf::identity(), .scale = { 1.0F, 1.0F, 1.0F } },
+        { .name = "pelvis", .parent_index = 0, .translation = { 0.0F, 2.0F, 0.0F }, .rotation = Math::Quatf::from_axis_angle({ 0.0F, 0.0F, 1.0F }, DEG_TO_RAD(30.0F)), .scale = { 1.0F, 1.0F, 1.0F } },
+        { .name = "spine", .parent_index = 1, .translation = { 0.0F, 3.0F, 0.0F }, .rotation = Math::Quatf::identity(), .scale = { 2.0F, 2.0F, 2.0F } },
+    };
+    skeleton.skin_joints = { 1, 2 };
+    skeleton.inverse_bind_matrices = {
+        Math::Mat4f::translation(0.0F, -2.0F, 0.0F),
+        Math::Mat4f::translation(0.0F, -5.0F, 0.0F)
+    };
+    return skeleton;
+}
+
+auto make_skinned_model() -> Asset::ModelData
+{
+    Asset::MaterialData material;
+    material.name = "Trooper";
+
+    return Asset::ModelData {
+        .sub_meshes = {
+            { .vertices = {},
+                .skinned_vertices = { make_skinned_vertex(0.0F, { 0, 1, 0, 1 }), make_skinned_vertex(5.0F, { 1, 1, 0, 0 }) },
+                .indices = { 0, 1, 0 },
+                .material_index = 0 } },
+        .materials = { material },
+        .skeleton = make_skeleton()
+    };
+}
+
+}
+
+TEST(AssetTraits, ModelWithoutASkeletonRoundTrips)
+{
+    auto const result = round_trip(make_model());
+
+    ASSERT_TRUE(result.has_value()) << result.error();
+    EXPECT_FALSE(result.value().skeleton.has_value());
+    EXPECT_FALSE(result.value().sub_meshes[0].is_skinned());
+}
+
+TEST(AssetTraits, SkeletonRoundTrips)
+{
+    auto const original = make_skinned_model();
+    auto const result = round_trip(original);
+
+    ASSERT_TRUE(result.has_value()) << result.error();
+    ASSERT_TRUE(result.value().skeleton.has_value());
+
+    auto const& expected = original.skeleton.value();
+    auto const& actual = result.value().skeleton.value();
+
+    ASSERT_EQ(actual.nodes.size(), expected.nodes.size());
+    for (std::size_t index = 0; index < actual.nodes.size(); ++index) {
+        EXPECT_EQ(actual.nodes[index].name, expected.nodes[index].name);
+        EXPECT_EQ(actual.nodes[index].parent_index, expected.nodes[index].parent_index);
+        EXPECT_EQ(actual.nodes[index].translation.y, expected.nodes[index].translation.y);
+        EXPECT_EQ(actual.nodes[index].rotation, expected.nodes[index].rotation);
+        EXPECT_EQ(actual.nodes[index].scale.x, expected.nodes[index].scale.x);
+    }
+
+    EXPECT_EQ(actual.skin_joints, expected.skin_joints);
+    ASSERT_EQ(actual.inverse_bind_matrices.size(), expected.inverse_bind_matrices.size());
+    for (std::size_t index = 0; index < actual.inverse_bind_matrices.size(); ++index) {
+        EXPECT_EQ(actual.inverse_bind_matrices[index].elements(), expected.inverse_bind_matrices[index].elements());
+    }
+}
+
+TEST(AssetTraits, SkinnedVerticesRoundTrip)
+{
+    auto const original = make_skinned_model();
+    auto const result = round_trip(original);
+
+    ASSERT_TRUE(result.has_value()) << result.error();
+    auto const& sub_mesh = result.value().sub_meshes[0];
+
+    EXPECT_TRUE(sub_mesh.is_skinned());
+    EXPECT_EQ(sub_mesh.vertex_count(), 2U);
+    EXPECT_TRUE(same_bytes(sub_mesh.skinned_vertices, original.sub_meshes[0].skinned_vertices));
+}
+
+TEST(AssetTraits, SkeletonWithAForwardParentReferenceIsRejected)
+{
+    auto model = make_skinned_model();
+    model.skeleton->nodes[0].parent_index = 2;
+
+    auto const result = round_trip(model);
+    EXPECT_FALSE(result.has_value());
+}
+
+TEST(AssetTraits, SkeletonWithMismatchedInverseBindMatricesIsRejected)
+{
+    auto model = make_skinned_model();
+    model.skeleton->inverse_bind_matrices.pop_back();
+
+    auto const result = round_trip(model);
+    EXPECT_FALSE(result.has_value());
+}
+
+TEST(AssetTraits, SkeletonJointPointingOutsideTheHierarchyIsRejected)
+{
+    auto model = make_skinned_model();
+    model.skeleton->skin_joints[0] = 99;
+
+    auto const result = round_trip(model);
+    EXPECT_FALSE(result.has_value());
+}
+
+TEST(AssetTraits, SkinnedVertexReferencingAMissingBoneIsRejected)
+{
+    auto model = make_skinned_model();
+    model.sub_meshes[0].skinned_vertices[0].bone_indices.z = 7;
+
+    auto const result = round_trip(model);
+    EXPECT_FALSE(result.has_value());
+}
+
+TEST(AssetTraits, SkinnedVerticesWithoutASkeletonAreRejected)
+{
+    auto model = make_skinned_model();
+    model.skeleton.reset();
+
+    auto const result = round_trip(model);
+    EXPECT_FALSE(result.has_value());
+}
+
+TEST(AssetTraits, SubMeshHoldingBothVertexKindsIsRejected)
+{
+    auto model = make_skinned_model();
+    model.sub_meshes[0].vertices.push_back(make_vertex(0.0F));
+
+    auto const result = round_trip(model);
+    EXPECT_FALSE(result.has_value());
 }

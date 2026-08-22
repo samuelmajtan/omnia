@@ -97,12 +97,16 @@ private:
 
 }
 
+// NOLINTBEGIN(cppcoreguidelines-avoid-do-while)
+
 #define OA_LOG_AT(logger, level, ...)                    \
     do {                                                 \
         if constexpr (::Debug::is_compiled(level)) {     \
             (logger).log(level, __VA_ARGS__);            \
         }                                                \
     } while (false)
+
+// NOLINTEND(cppcoreguidelines-avoid-do-while)
 
 #define OA_LOG_TRACE(logger, ...)   OA_LOG_AT(logger, ::Debug::LogLevel::Trace, __VA_ARGS__)
 #define OA_LOG_DEBUG(logger, ...)   OA_LOG_AT(logger, ::Debug::LogLevel::Debug, __VA_ARGS__)
